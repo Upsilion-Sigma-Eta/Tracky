@@ -1,3 +1,5 @@
+using Tracky.Core.Reminders;
+
 namespace Tracky.Core.Issues;
 
 public sealed record IssueDetail(
@@ -5,4 +7,6 @@ public sealed record IssueDetail(
     string Description,
     IReadOnlyList<IssueComment> Comments,
     IReadOnlyList<IssueAttachment> Attachments,
-    IReadOnlyList<IssueActivityEntry> Activity);
+    IReadOnlyList<IssueActivityEntry> Activity,
+    IReadOnlyList<IssueReminder> Reminders,
+    IReadOnlyList<IssueRelation> Relations);

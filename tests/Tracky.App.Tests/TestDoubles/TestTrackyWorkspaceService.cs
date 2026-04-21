@@ -1,5 +1,10 @@
+using System.Text;
+using Tracky.Core.Exports;
 using Tracky.Core.Issues;
+using Tracky.Core.Preferences;
 using Tracky.Core.Projects;
+using Tracky.Core.Reminders;
+using Tracky.Core.Search;
 using Tracky.Core.Services;
 using Tracky.Core.Workspaces;
 
@@ -14,12 +19,17 @@ public sealed class TestTrackyWorkspaceService : ITrackyWorkspaceService
     private readonly Dictionary<Guid, Dictionary<string, string>> _customFieldValuesByProjectItemId = [];
     private readonly Dictionary<Guid, List<IssueComment>> _commentsByIssueId = [];
     private readonly Dictionary<Guid, string> _descriptionByIssueId = [];
+    private readonly Dictionary<Guid, List<IssueRelation>> _relationsByIssueId = [];
+    private readonly Dictionary<Guid, IssueReminder> _remindersById = [];
     private readonly Dictionary<Guid, string> _projectDescriptionById = [];
     private readonly Dictionary<Guid, (Guid ProjectId, Guid IssueId)> _projectItemLocationById = [];
     private readonly Dictionary<(Guid ProjectId, Guid IssueId), Guid> _projectItemIdByIssue = [];
     private readonly Dictionary<Guid, string> _projectNameById = [];
     private readonly Dictionary<string, Guid> _projectIdByName = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<Guid, List<ProjectSavedView>> _savedViewsByProjectId = [];
+    private readonly List<ExportPreset> _exportPresets = [];
+    private readonly List<SavedIssueSearch> _savedIssueSearches = [];
+    private WorkspacePreferences _preferences = WorkspacePreferences.Default;
     private readonly Dictionary<Guid, string> _boardColumnByProjectItemId = [];
     private readonly List<IssueListItem> _issues = [];
 
@@ -107,6 +117,28 @@ public sealed class TestTrackyWorkspaceService : ITrackyWorkspaceService
                 now.AddMinutes(-9)),
         ];
         service._activityByIssueId[closedIssueId] = [];
+        service._relationsByIssueId[openIssueId] = [];
+        service._relationsByIssueId[closedIssueId] = [];
+
+        service._exportPresets.Add(
+            new ExportPreset(
+                Guid.NewGuid(),
+                "Filtered Markdown handoff",
+                ExportSelectionScope.CurrentFilter,
+                ExportFormat.Markdown,
+                ExportBodyFormat.Markdown,
+                IncludeComments: true,
+                IncludeActivity: true,
+                IncludeAttachments: false,
+                IncludeClosedIssues: false,
+                now));
+        service._savedIssueSearches.Add(
+            new SavedIssueSearch(
+                Guid.NewGuid(),
+                "Open desktop work",
+                "is:open label:desktop",
+                IsPinned: true,
+                now));
 
         return service;
     }
@@ -125,7 +157,13 @@ public sealed class TestTrackyWorkspaceService : ITrackyWorkspaceService
                 "A deterministic workspace used by GUI and view-model tests.",
                 "memory://tracky-tests",
                 metrics,
-                orderedIssues));
+                orderedIssues,
+                [.. _remindersById.Values.Where(static reminder => !reminder.IsDismissed).OrderBy(static reminder => reminder.RemindAtUtc)],
+                [.. _exportPresets],
+                [.. _savedIssueSearches],
+                [],
+                [],
+                _preferences));
     }
 
     public Task<IssueDetail?> GetIssueDetailAsync(Guid issueId, CancellationToken cancellationToken = default)
@@ -142,7 +180,9 @@ public sealed class TestTrackyWorkspaceService : ITrackyWorkspaceService
                 _descriptionByIssueId.GetValueOrDefault(issueId, string.Empty),
                 GetComments(issueId),
                 GetAttachments(issueId),
-                GetActivity(issueId)));
+                GetActivity(issueId),
+                GetReminders(issueId),
+                GetRelations(issueId)));
     }
 
     public Task<IssueListItem> CreateIssueAsync(CreateIssueInput input, CancellationToken cancellationToken = default)
@@ -161,7 +201,9 @@ public sealed class TestTrackyWorkspaceService : ITrackyWorkspaceService
             input.ProjectName,
             0,
             0,
-            [.. input.Labels]);
+            [.. input.Labels],
+            input.MilestoneName,
+            input.IssueTypeName);
 
         _issues.Add(issue);
         if (!string.IsNullOrWhiteSpace(issue.ProjectName))
@@ -172,6 +214,7 @@ public sealed class TestTrackyWorkspaceService : ITrackyWorkspaceService
         _descriptionByIssueId[issue.Id] = "Created by the quick capture flow.";
         _commentsByIssueId[issue.Id] = [];
         _attachmentsByIssueId[issue.Id] = [];
+        _relationsByIssueId[issue.Id] = [];
         _activityByIssueId[issue.Id] =
         [
             new IssueActivityEntry(
@@ -207,6 +250,12 @@ public sealed class TestTrackyWorkspaceService : ITrackyWorkspaceService
                 ? null
                 : input.ProjectName.Trim(),
             Labels = [.. input.Labels],
+            MilestoneName = string.IsNullOrWhiteSpace(input.MilestoneName)
+                ? null
+                : input.MilestoneName.Trim(),
+            IssueTypeName = string.IsNullOrWhiteSpace(input.IssueTypeName)
+                ? null
+                : input.IssueTypeName.Trim(),
         };
 
         // 테스트 더블도 프로덕션 서비스처럼 본문/라벨/메타데이터를 함께 갱신해야
@@ -271,6 +320,13 @@ public sealed class TestTrackyWorkspaceService : ITrackyWorkspaceService
         _commentsByIssueId.Remove(issueId);
         _attachmentsByIssueId.Remove(issueId);
         _activityByIssueId.Remove(issueId);
+        _relationsByIssueId.Remove(issueId);
+        foreach (var relations in _relationsByIssueId.Values)
+        {
+            // 삭제된 이슈를 대상으로 삼던 관계도 테스트 더블 안에서 같이 제거해
+            // 실제 SQLite FK/cascade 동작과 같은 고아 데이터 없는 상태를 검증한다.
+            relations.RemoveAll(relation => relation.TargetIssueId == issueId);
+        }
 
         foreach (var projectItem in _projectItemLocationById
             .Where(pair => pair.Value.IssueId == issueId)
@@ -345,6 +401,147 @@ public sealed class TestTrackyWorkspaceService : ITrackyWorkspaceService
         var path = Path.Combine(Path.GetTempPath(), $"tracky-test-{attachmentId:N}.bin");
         await File.WriteAllBytesAsync(path, content, cancellationToken);
         return path;
+    }
+
+    public Task<IssueRelation?> AddIssueRelationAsync(
+        AddIssueRelationInput input,
+        CancellationToken cancellationToken = default)
+    {
+        var source = _issues.FirstOrDefault(issue => issue.Id == input.SourceIssueId);
+        var target = _issues.FirstOrDefault(issue => issue.Id == input.TargetIssueId);
+        if (source is null || target is null || source.Id == target.Id)
+        {
+            return Task.FromResult<IssueRelation?>(null);
+        }
+
+        var relation = new IssueRelation(
+            Guid.NewGuid(),
+            source.Id,
+            target.Id,
+            target.Number,
+            target.Title,
+            input.RelationType,
+            DateTimeOffset.UtcNow);
+        if (!_relationsByIssueId.TryGetValue(source.Id, out var relations))
+        {
+            relations = [];
+            _relationsByIssueId[source.Id] = relations;
+        }
+
+        relations.Add(relation);
+        AddActivity(source.Id, "issue.relation.added", $"Relation to #{target.Number} was added.");
+        return Task.FromResult<IssueRelation?>(relation);
+    }
+
+    public Task<IssueReminder?> ScheduleIssueReminderAsync(
+        ScheduleIssueReminderInput input,
+        CancellationToken cancellationToken = default)
+    {
+        var issue = _issues.FirstOrDefault(item => item.Id == input.IssueId);
+        if (issue is null)
+        {
+            return Task.FromResult<IssueReminder?>(null);
+        }
+
+        var reminder = new IssueReminder(
+            Guid.NewGuid(),
+            input.IssueId,
+            string.IsNullOrWhiteSpace(input.Title) ? $"Follow up on #{issue.Number}" : input.Title.Trim(),
+            input.Note.Trim(),
+            input.RemindAtUtc,
+            DateTimeOffset.UtcNow,
+            null);
+        _remindersById[reminder.Id] = reminder;
+        AddActivity(input.IssueId, "issue.reminder.scheduled", $"Reminder scheduled for {reminder.RemindAtUtc:MMM dd, HH:mm}.");
+        return Task.FromResult<IssueReminder?>(reminder);
+    }
+
+    public Task<IssueReminder?> DismissReminderAsync(
+        DismissReminderInput input,
+        CancellationToken cancellationToken = default)
+    {
+        if (!_remindersById.TryGetValue(input.ReminderId, out var reminder))
+        {
+            return Task.FromResult<IssueReminder?>(null);
+        }
+
+        var dismissed = reminder with { DismissedAtUtc = DateTimeOffset.UtcNow };
+        _remindersById[input.ReminderId] = dismissed;
+        if (dismissed.IssueId is Guid issueId)
+        {
+            AddActivity(issueId, "issue.reminder.dismissed", $"Reminder \"{dismissed.Title}\" was dismissed.");
+        }
+
+        return Task.FromResult<IssueReminder?>(dismissed);
+    }
+
+    public async Task<ExportResult> ExportSelectionAsync(
+        ExportOptions options,
+        CancellationToken cancellationToken = default)
+    {
+        var issues = ResolveExportIssues(options);
+        var exportDirectory = Path.Combine(Path.GetTempPath(), "Tracky.Tests", $"export-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(exportDirectory);
+
+        var outputPath = Path.Combine(exportDirectory, options.Format == ExportFormat.Html ? "tracky-export.html" : "tracky-export.md");
+        var builder = new StringBuilder();
+        foreach (var issue in issues)
+        {
+            builder.Append("# #")
+                .Append(issue.Number)
+                .Append(' ')
+                .AppendLine(issue.Title);
+        }
+
+        await File.WriteAllTextAsync(outputPath, builder.ToString(), cancellationToken);
+        return new ExportResult(outputPath, issues.Count, 0, options.Format);
+    }
+
+    public Task<ExportPreset?> AddExportPresetAsync(
+        AddExportPresetInput input,
+        CancellationToken cancellationToken = default)
+    {
+        _exportPresets.RemoveAll(preset => string.Equals(preset.Name, input.Name.Trim(), StringComparison.OrdinalIgnoreCase));
+        var preset = new ExportPreset(
+            Guid.NewGuid(),
+            input.Name.Trim(),
+            input.Scope,
+            input.Format,
+            input.BodyFormat,
+            input.IncludeComments,
+            input.IncludeActivity,
+            input.IncludeAttachments,
+            input.IncludeClosedIssues,
+            DateTimeOffset.UtcNow);
+        _exportPresets.Add(preset);
+        return Task.FromResult<ExportPreset?>(preset);
+    }
+
+    public Task<SavedIssueSearch?> AddSavedIssueSearchAsync(
+        AddSavedIssueSearchInput input,
+        CancellationToken cancellationToken = default)
+    {
+        _savedIssueSearches.RemoveAll(search => string.Equals(search.Name, input.Name.Trim(), StringComparison.OrdinalIgnoreCase));
+        var savedSearch = new SavedIssueSearch(
+            Guid.NewGuid(),
+            input.Name.Trim(),
+            input.QueryText.Trim(),
+            input.IsPinned,
+            DateTimeOffset.UtcNow);
+        _savedIssueSearches.Add(savedSearch);
+        return Task.FromResult<SavedIssueSearch?>(savedSearch);
+    }
+
+    public Task<WorkspacePreferences> UpdateWorkspacePreferencesAsync(
+        UpdateWorkspacePreferencesInput input,
+        CancellationToken cancellationToken = default)
+    {
+        _preferences = new WorkspacePreferences(
+            input.Theme,
+            input.CompactDensity,
+            string.IsNullOrWhiteSpace(input.ShortcutProfile) ? "Default" : input.ShortcutProfile.Trim(),
+            DateTimeOffset.UtcNow);
+        return Task.FromResult(_preferences);
     }
 
     public Task<IReadOnlyList<ProjectSummary>> GetProjectsAsync(CancellationToken cancellationToken = default)
@@ -668,6 +865,41 @@ public sealed class TestTrackyWorkspaceService : ITrackyWorkspaceService
         return _activityByIssueId.TryGetValue(issueId, out var activity)
             ? [.. activity.OrderByDescending(static item => item.CreatedAtUtc)]
             : [];
+    }
+
+    private IssueReminder[] GetReminders(Guid issueId)
+    {
+        return [.. _remindersById.Values
+            .Where(reminder => reminder.IssueId == issueId)
+            .OrderBy(static reminder => reminder.RemindAtUtc)];
+    }
+
+    private IssueRelation[] GetRelations(Guid issueId)
+    {
+        return _relationsByIssueId.TryGetValue(issueId, out var relations)
+            ? [.. relations.OrderByDescending(static relation => relation.CreatedAtUtc)]
+            : [];
+    }
+
+    private IReadOnlyList<IssueListItem> ResolveExportIssues(ExportOptions options)
+    {
+        IEnumerable<IssueListItem> selectedIssues = options.Scope switch
+        {
+            ExportSelectionScope.CurrentIssue when options.IssueId is Guid issueId =>
+                _issues.Where(issue => issue.Id == issueId),
+            ExportSelectionScope.CurrentFilter =>
+                _issues.Where(issue => options.IssueIds.Contains(issue.Id)),
+            ExportSelectionScope.Project when options.ProjectId is Guid projectId && _projectNameById.TryGetValue(projectId, out var projectName) =>
+                _issues.Where(issue => string.Equals(issue.ProjectName, projectName, StringComparison.OrdinalIgnoreCase)),
+            _ => _issues,
+        };
+
+        if (!options.IncludeClosedIssues)
+        {
+            selectedIssues = selectedIssues.Where(static issue => issue.State == IssueWorkflowState.Open);
+        }
+
+        return [.. selectedIssues.OrderBy(static issue => issue.Number)];
     }
 
     private void AddActivity(Guid issueId, string eventType, string summary)

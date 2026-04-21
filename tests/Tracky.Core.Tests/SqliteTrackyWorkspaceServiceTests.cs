@@ -1,6 +1,10 @@
 using Microsoft.Data.Sqlite;
+using Tracky.Core.Exports;
 using Tracky.Core.Issues;
+using Tracky.Core.Preferences;
 using Tracky.Core.Projects;
+using Tracky.Core.Reminders;
+using Tracky.Core.Search;
 using Tracky.Infrastructure.Persistence;
 
 namespace Tracky.Core.Tests;
@@ -554,6 +558,300 @@ public sealed class SqliteTrackyWorkspaceServiceTests
             if (Directory.Exists(testRoot))
             {
                 Directory.Delete(testRoot, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task Phase3_reminders_round_trip_and_activity_log_records_schedule_and_dismiss()
+    {
+        var testRoot = Path.Combine(
+            Path.GetTempPath(),
+            "Tracky.Tests",
+            Guid.NewGuid().ToString("N"));
+
+        try
+        {
+            var service = new SqliteTrackyWorkspaceService(
+                new TrackyWorkspacePathProvider(testRoot));
+            var issue = await service.CreateIssueAsync(
+                new CreateIssueInput(
+                    "Schedule the first Phase 3 reminder",
+                    "Dabin",
+                    IssuePriority.High,
+                    DateOnly.FromDateTime(DateTime.Today).AddDays(1),
+                    "Tracky Phase 3",
+                    ["phase3", "reminder"]));
+
+            var reminderAtUtc = DateTimeOffset.UtcNow.AddHours(3);
+            var reminder = await service.ScheduleIssueReminderAsync(
+                new ScheduleIssueReminderInput(
+                    issue.Id,
+                    "Follow up on reminder UX",
+                    "Make sure the in-app reminder rail shows this item.",
+                    reminderAtUtc));
+
+            Assert.NotNull(reminder);
+            Assert.Equal(issue.Id, reminder.IssueId);
+
+            var overviewWithReminder = await service.GetOverviewAsync();
+            Assert.Contains(overviewWithReminder.Reminders, item => item.Id == reminder.Id);
+
+            var detailWithReminder = await service.GetIssueDetailAsync(issue.Id);
+            Assert.NotNull(detailWithReminder);
+            Assert.Contains(detailWithReminder.Reminders, item => item.Id == reminder.Id && !item.IsDismissed);
+            Assert.Contains(detailWithReminder.Activity, item => item.EventType == "issue.reminder.scheduled");
+
+            var dismissedReminder = await service.DismissReminderAsync(new DismissReminderInput(reminder.Id));
+            Assert.NotNull(dismissedReminder);
+            Assert.True(dismissedReminder.IsDismissed);
+
+            var overviewAfterDismiss = await service.GetOverviewAsync();
+            Assert.DoesNotContain(overviewAfterDismiss.Reminders, item => item.Id == reminder.Id);
+
+            var detailAfterDismiss = await service.GetIssueDetailAsync(issue.Id);
+            Assert.NotNull(detailAfterDismiss);
+            Assert.Contains(detailAfterDismiss.Reminders, item => item.Id == reminder.Id && item.IsDismissed);
+            Assert.Contains(detailAfterDismiss.Activity, item => item.EventType == "issue.reminder.dismissed");
+        }
+        finally
+        {
+            SqliteConnection.ClearAllPools();
+
+            if (Directory.Exists(testRoot))
+            {
+                Directory.Delete(testRoot, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task Phase3_issue_metadata_relations_saved_searches_and_preferences_round_trip()
+    {
+        var testRoot = Path.Combine(
+            Path.GetTempPath(),
+            "Tracky.Tests",
+            Guid.NewGuid().ToString("N"));
+
+        try
+        {
+            var service = new SqliteTrackyWorkspaceService(
+                new TrackyWorkspacePathProvider(testRoot));
+            var sourceIssue = await service.CreateIssueAsync(
+                new CreateIssueInput(
+                    "Connect Phase 3 metadata to the issue shell",
+                    "Dabin",
+                    IssuePriority.High,
+                    new DateOnly(2026, 4, 30),
+                    "Tracky Phase 3",
+                    ["phase3", "metadata"],
+                    "MVP Readiness",
+                    "Bug"));
+            var targetIssue = await service.CreateIssueAsync(
+                new CreateIssueInput(
+                    "Track dependent relation target",
+                    "Dabin",
+                    IssuePriority.Medium,
+                    new DateOnly(2026, 5, 2),
+                    "Tracky Phase 3",
+                    ["phase3", "relation"],
+                    "MVP Readiness",
+                    "Task"));
+
+            Assert.Equal("MVP Readiness", sourceIssue.MilestoneName);
+            Assert.Equal("Bug", sourceIssue.IssueTypeName);
+
+            var updatedSource = await service.UpdateIssueAsync(
+                new UpdateIssueInput(
+                    sourceIssue.Id,
+                    "Connect Phase 3 metadata to the issue shell",
+                    "Milestone and issue type should survive update and overview reload.",
+                    "Dabin",
+                    IssuePriority.Critical,
+                    new DateOnly(2026, 5, 1),
+                    "Tracky Phase 3",
+                    ["phase3", "metadata", "bug"],
+                    "Phase 3 Validation",
+                    "Bug"));
+            Assert.NotNull(updatedSource);
+            Assert.Equal("Phase 3 Validation", updatedSource.MilestoneName);
+            Assert.Equal("Bug", updatedSource.IssueTypeName);
+
+            var relation = await service.AddIssueRelationAsync(
+                new AddIssueRelationInput(
+                    updatedSource.Id,
+                    targetIssue.Id,
+                    IssueRelationType.Blocks));
+            Assert.NotNull(relation);
+            Assert.Equal(targetIssue.Number, relation.TargetIssueNumber);
+
+            var savedSearch = await service.AddSavedIssueSearchAsync(
+                new AddSavedIssueSearchInput(
+                    "Phase 3 validation bugs",
+                    "milestone:\"Phase 3 Validation\" type:bug is:open",
+                    IsPinned: true));
+            Assert.NotNull(savedSearch);
+            Assert.True(savedSearch.IsPinned);
+
+            var preferences = await service.UpdateWorkspacePreferencesAsync(
+                new UpdateWorkspacePreferencesInput(
+                    AppThemePreference.Dark,
+                    CompactDensity: false,
+                    "Vim"));
+            Assert.Equal(AppThemePreference.Dark, preferences.Theme);
+            Assert.False(preferences.CompactDensity);
+            Assert.Equal("Vim", preferences.ShortcutProfile);
+
+            var overview = await service.GetOverviewAsync();
+            var validationMilestone = Assert.Single(
+                overview.Milestones,
+                milestone => milestone.Name == "Phase 3 Validation");
+            Assert.Equal(new DateOnly(2026, 5, 1), validationMilestone.DueDate);
+            Assert.Equal(1, validationMilestone.OpenIssues);
+            Assert.Contains(overview.IssueTypes, issueType => issueType.Name == "Bug");
+            Assert.Contains(overview.SavedIssueSearches, search => search.Name == "Phase 3 validation bugs" && search.IsPinned);
+            Assert.Equal(AppThemePreference.Dark, overview.Preferences.Theme);
+            Assert.False(overview.Preferences.CompactDensity);
+            Assert.Equal("Vim", overview.Preferences.ShortcutProfile);
+
+            var detail = await service.GetIssueDetailAsync(sourceIssue.Id);
+            Assert.NotNull(detail);
+            Assert.Equal("Phase 3 Validation", detail.Summary.MilestoneName);
+            Assert.Equal("Bug", detail.Summary.IssueTypeName);
+            Assert.Contains(
+                detail.Relations,
+                item => item.TargetIssueId == targetIssue.Id && item.RelationType == IssueRelationType.Blocks);
+            Assert.Contains(detail.Activity, item => item.EventType == "issue.relation.added");
+        }
+        finally
+        {
+            SqliteConnection.ClearAllPools();
+
+            if (Directory.Exists(testRoot))
+            {
+                Directory.Delete(testRoot, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task Phase3_export_options_create_markdown_folder_tree_package_and_persist_presets()
+    {
+        var testRoot = Path.Combine(
+            Path.GetTempPath(),
+            "Tracky.Tests",
+            Guid.NewGuid().ToString("N"));
+        var exportRoot = Path.Combine(
+            Path.GetTempPath(),
+            "Tracky.Tests.Export",
+            Guid.NewGuid().ToString("N"));
+
+        try
+        {
+            var service = new SqliteTrackyWorkspaceService(
+                new TrackyWorkspacePathProvider(testRoot));
+            var issue = await service.CreateIssueAsync(
+                new CreateIssueInput(
+                    "Export a portable Phase 3 handoff",
+                    "Dabin",
+                    IssuePriority.Critical,
+                    DateOnly.FromDateTime(DateTime.Today).AddDays(2),
+                    "Tracky Phase 3",
+                    ["phase3", "export"]));
+            var comment = await service.AddIssueCommentAsync(
+                new AddIssueCommentInput(
+                    issue.Id,
+                    "Dabin",
+                    "Export should include comments when requested."));
+            var attachment = await service.AddIssueAttachmentAsync(
+                new AddIssueAttachmentInput(
+                    issue.Id,
+                    "phase3-export.txt",
+                    "text/plain",
+                    "portable export attachment"u8.ToArray()));
+
+            Assert.NotNull(comment);
+            Assert.NotNull(attachment);
+
+            var preset = await service.AddExportPresetAsync(
+                new AddExportPresetInput(
+                    "Phase3 portable package",
+                    ExportSelectionScope.CurrentIssue,
+                    ExportFormat.PortablePackage,
+                    ExportBodyFormat.Html,
+                    IncludeComments: true,
+                    IncludeActivity: true,
+                    IncludeAttachments: true,
+                    IncludeClosedIssues: true));
+            Assert.NotNull(preset);
+
+            var overview = await service.GetOverviewAsync();
+            Assert.Contains(overview.ExportPresets, item => item.Name == "Phase3 portable package");
+
+            var markdownResult = await service.ExportSelectionAsync(
+                new ExportOptions(
+                    ExportSelectionScope.CurrentIssue,
+                    ExportFormat.Markdown,
+                    ExportBodyFormat.Markdown,
+                    [],
+                    issue.Id,
+                    null,
+                    IncludeComments: true,
+                    IncludeActivity: true,
+                    IncludeAttachments: false,
+                    IncludeClosedIssues: true,
+                    exportRoot));
+            Assert.True(File.Exists(markdownResult.OutputPath));
+            var markdown = await File.ReadAllTextAsync(markdownResult.OutputPath);
+            Assert.Contains("Export a portable Phase 3 handoff", markdown);
+            Assert.Contains("Export should include comments", markdown);
+            Assert.Contains("## Activity", markdown);
+
+            var folderTreeResult = await service.ExportSelectionAsync(
+                new ExportOptions(
+                    ExportSelectionScope.CurrentIssue,
+                    ExportFormat.FolderTree,
+                    ExportBodyFormat.Markdown,
+                    [],
+                    issue.Id,
+                    null,
+                    IncludeComments: true,
+                    IncludeActivity: true,
+                    IncludeAttachments: true,
+                    IncludeClosedIssues: true,
+                    exportRoot));
+            Assert.True(Directory.Exists(folderTreeResult.OutputPath));
+            Assert.True(File.Exists(Path.Combine(folderTreeResult.OutputPath, "index.md")));
+            Assert.True(Directory.EnumerateFiles(folderTreeResult.OutputPath, "phase3-export.txt", SearchOption.AllDirectories).Any());
+
+            var packageResult = await service.ExportSelectionAsync(
+                new ExportOptions(
+                    ExportSelectionScope.Workspace,
+                    ExportFormat.PortablePackage,
+                    ExportBodyFormat.Html,
+                    [],
+                    null,
+                    null,
+                    IncludeComments: true,
+                    IncludeActivity: true,
+                    IncludeAttachments: true,
+                    IncludeClosedIssues: true,
+                    exportRoot));
+            Assert.True(File.Exists(packageResult.OutputPath));
+            Assert.EndsWith(".zip", packageResult.OutputPath, StringComparison.OrdinalIgnoreCase);
+        }
+        finally
+        {
+            SqliteConnection.ClearAllPools();
+
+            if (Directory.Exists(testRoot))
+            {
+                Directory.Delete(testRoot, recursive: true);
+            }
+
+            if (Directory.Exists(exportRoot))
+            {
+                Directory.Delete(exportRoot, recursive: true);
             }
         }
     }

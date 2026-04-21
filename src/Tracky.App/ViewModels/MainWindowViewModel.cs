@@ -1,8 +1,12 @@
 using System.Collections.ObjectModel;
 using System.Globalization;
 using Tracky.App.Services;
+using Tracky.Core.Exports;
 using Tracky.Core.Issues;
+using Tracky.Core.Preferences;
 using Tracky.Core.Projects;
+using Tracky.Core.Reminders;
+using Tracky.Core.Search;
 using Tracky.Core.Services;
 
 namespace Tracky.App.ViewModels;
@@ -73,6 +77,19 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         AddCommentCommand = new AsyncRelayCommand(AddCommentAsync, CanAddComment);
         AttachFileCommand = new AsyncRelayCommand(AttachFileAsync, CanAttachFile);
         OpenAttachmentCommand = new AsyncRelayCommand<IssueAttachmentViewModel?>(OpenAttachmentAsync, CanOpenAttachment);
+        AddIssueRelationCommand = new AsyncRelayCommand(AddIssueRelationAsync, CanAddIssueRelation);
+        ScheduleReminderCommand = new AsyncRelayCommand(ScheduleReminderAsync, CanScheduleReminder);
+        DismissReminderCommand = new AsyncRelayCommand<IssueReminderViewModel?>(DismissReminderAsync, CanDismissReminder);
+        SaveIssueSearchCommand = new AsyncRelayCommand(SaveIssueSearchAsync, CanSaveIssueSearch);
+        ApplySavedIssueSearchCommand = new AsyncRelayCommand<SavedIssueSearchViewModel?>(
+            ApplySavedIssueSearchAsync,
+            CanApplySavedIssueSearch);
+        SavePreferencesCommand = new AsyncRelayCommand(SavePreferencesAsync);
+        ExportSelectionCommand = new AsyncRelayCommand(ExportSelectionAsync, CanExportSelection);
+        SaveExportPresetCommand = new AsyncRelayCommand(SaveExportPresetAsync, CanSaveExportPreset);
+        ApplyExportPresetCommand = new AsyncRelayCommand<ExportPresetViewModel?>(
+            ApplyExportPresetAsync,
+            CanApplyExportPreset);
         MoveProjectItemForwardCommand = new AsyncRelayCommand<ProjectIssueItemViewModel?>(
             MoveProjectItemForwardAsync,
             CanMoveProjectItemForward);
@@ -91,11 +108,26 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         DraftPriority = IssuePriority.High;
         DraftProjectName = "Tracky Foundation";
         DraftLabels = "foundation, desktop";
+        DraftMilestoneName = "MVP Readiness";
+        DraftIssueTypeName = "Task";
         NewProjectName = "Tracky Phase 2";
         NewProjectDescription = "Project board, table, calendar, timeline, custom fields, and saved views.";
         DraftCustomFieldType = ProjectCustomFieldType.Text;
         DraftSavedViewMode = ProjectViewMode.Board;
         DraftSavedViewSort = DefaultProjectSortField;
+        DraftReminderAt = DateTimeOffset.Now.AddHours(2);
+        DraftExportScope = ExportSelectionScope.CurrentFilter;
+        DraftExportFormat = ExportFormat.Markdown;
+        DraftExportBodyFormat = ExportBodyFormat.Markdown;
+        DraftExportIncludeComments = true;
+        DraftExportIncludeActivity = true;
+        DraftExportIncludeAttachments = false;
+        DraftExportIncludeClosedIssues = false;
+        DraftRelationType = IssueRelationType.Related;
+        DraftSavedIssueSearchPinned = true;
+        SelectedThemePreference = AppThemePreference.Light;
+        CompactDensityPreference = true;
+        ShortcutProfilePreference = "Default";
 
         RefreshProjectArrangementOptions([]);
     }
@@ -135,6 +167,24 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     public AsyncRelayCommand AttachFileCommand { get; }
 
     public AsyncRelayCommand<IssueAttachmentViewModel?> OpenAttachmentCommand { get; }
+
+    public AsyncRelayCommand AddIssueRelationCommand { get; }
+
+    public AsyncRelayCommand ScheduleReminderCommand { get; }
+
+    public AsyncRelayCommand<IssueReminderViewModel?> DismissReminderCommand { get; }
+
+    public AsyncRelayCommand SaveIssueSearchCommand { get; }
+
+    public AsyncRelayCommand<SavedIssueSearchViewModel?> ApplySavedIssueSearchCommand { get; }
+
+    public AsyncRelayCommand SavePreferencesCommand { get; }
+
+    public AsyncRelayCommand ExportSelectionCommand { get; }
+
+    public AsyncRelayCommand SaveExportPresetCommand { get; }
+
+    public AsyncRelayCommand<ExportPresetViewModel?> ApplyExportPresetCommand { get; }
 
     public AsyncRelayCommand<ProjectIssueItemViewModel?> MoveProjectItemForwardCommand { get; }
 
@@ -189,7 +239,23 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
 
     public ObservableCollection<ProjectSavedViewViewModel> ProjectSavedViews { get; } = [];
 
+    public ObservableCollection<IssueReminderViewModel> WorkspaceReminders { get; } = [];
+
+    public ObservableCollection<ExportPresetViewModel> ExportPresets { get; } = [];
+
+    public ObservableCollection<SavedIssueSearchViewModel> SavedIssueSearches { get; } = [];
+
     public IReadOnlyList<IssuePriority> AvailablePriorities { get; } = Enum.GetValues<IssuePriority>();
+
+    public IReadOnlyList<IssueRelationType> AvailableIssueRelationTypes { get; } = Enum.GetValues<IssueRelationType>();
+
+    public IReadOnlyList<AppThemePreference> AvailableThemePreferences { get; } = Enum.GetValues<AppThemePreference>();
+
+    public IReadOnlyList<ExportSelectionScope> AvailableExportScopes { get; } = Enum.GetValues<ExportSelectionScope>();
+
+    public IReadOnlyList<ExportFormat> AvailableExportFormats { get; } = Enum.GetValues<ExportFormat>();
+
+    public IReadOnlyList<ExportBodyFormat> AvailableExportBodyFormats { get; } = Enum.GetValues<ExportBodyFormat>();
 
     public IReadOnlyList<ProjectCustomFieldType> AvailableProjectCustomFieldTypes { get; } =
         Enum.GetValues<ProjectCustomFieldType>();
@@ -252,6 +318,18 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     public bool HasSelectedProjectItemForFields => SelectedProjectItemForFields is not null;
 
     public bool HasSelectedProjectCustomField => SelectedProjectCustomField is not null;
+
+    public bool HasWorkspaceReminders => WorkspaceReminders.Count > 0;
+
+    public bool HasNoWorkspaceReminders => !HasWorkspaceReminders;
+
+    public bool HasExportPresets => ExportPresets.Count > 0;
+
+    public bool HasNoExportPresets => !HasExportPresets;
+
+    public bool HasSavedIssueSearches => SavedIssueSearches.Count > 0;
+
+    public bool HasNoSavedIssueSearches => !HasSavedIssueSearches;
 
     private string _workspaceName = "Tracky";
 
@@ -323,6 +401,10 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
 
     private string _draftLabels = string.Empty;
 
+    private string _draftMilestoneName = string.Empty;
+
+    private string _draftIssueTypeName = string.Empty;
+
     private string _draftCommentAuthor = "Dabin";
 
     private string _draftCommentBody = string.Empty;
@@ -340,6 +422,10 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     private string _editProjectName = string.Empty;
 
     private string _editLabels = string.Empty;
+
+    private string _editMilestoneName = string.Empty;
+
+    private string _editIssueTypeName = string.Empty;
 
     private IssueStateReason _selectedCloseReason = IssueStateReason.Completed;
 
@@ -362,6 +448,44 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     private string _draftSavedViewSort = DefaultProjectSortField;
 
     private string _draftSavedViewGroup = NoProjectGroupingField;
+
+    private string _draftReminderTitle = string.Empty;
+
+    private string _draftReminderNote = string.Empty;
+
+    private DateTimeOffset? _draftReminderAt;
+
+    private string _exportPresetName = string.Empty;
+
+    private ExportSelectionScope _draftExportScope;
+
+    private ExportFormat _draftExportFormat;
+
+    private ExportBodyFormat _draftExportBodyFormat;
+
+    private bool _draftExportIncludeComments;
+
+    private bool _draftExportIncludeActivity;
+
+    private bool _draftExportIncludeAttachments;
+
+    private bool _draftExportIncludeClosedIssues;
+
+    private string _lastExportPath = string.Empty;
+
+    private string _draftSavedIssueSearchName = string.Empty;
+
+    private bool _draftSavedIssueSearchPinned;
+
+    private int _draftRelationTargetIssueNumber;
+
+    private IssueRelationType _draftRelationType;
+
+    private AppThemePreference _selectedThemePreference;
+
+    private bool _compactDensityPreference;
+
+    private string _shortcutProfilePreference = string.Empty;
 
     public string WorkspaceName
     {
@@ -389,6 +513,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
             if (SetProperty(ref _searchText, value))
             {
                 ApplyFilters();
+                SaveIssueSearchCommand.NotifyCanExecuteChanged();
             }
         }
     }
@@ -464,6 +589,9 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
             DeleteSelectedIssueCommand.NotifyCanExecuteChanged();
             AddCommentCommand.NotifyCanExecuteChanged();
             AttachFileCommand.NotifyCanExecuteChanged();
+            AddIssueRelationCommand.NotifyCanExecuteChanged();
+            ScheduleReminderCommand.NotifyCanExecuteChanged();
+            ExportSelectionCommand.NotifyCanExecuteChanged();
             StartDetailLoad(value?.Id);
         }
     }
@@ -484,6 +612,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
             HydrateEditDraft(value);
             UpdateSelectedIssueCommand.NotifyCanExecuteChanged();
             OpenAttachmentCommand.NotifyCanExecuteChanged();
+            DismissReminderCommand.NotifyCanExecuteChanged();
         }
     }
 
@@ -502,6 +631,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
             CreateProjectCommand.NotifyCanExecuteChanged();
             AddProjectCustomFieldCommand.NotifyCanExecuteChanged();
             AddProjectSavedViewCommand.NotifyCanExecuteChanged();
+            ExportSelectionCommand.NotifyCanExecuteChanged();
             StartProjectDetailLoad(value?.Id);
         }
     }
@@ -709,6 +839,18 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         set => SetProperty(ref _draftLabels, value);
     }
 
+    public string DraftMilestoneName
+    {
+        get => _draftMilestoneName;
+        set => SetProperty(ref _draftMilestoneName, value);
+    }
+
+    public string DraftIssueTypeName
+    {
+        get => _draftIssueTypeName;
+        set => SetProperty(ref _draftIssueTypeName, value);
+    }
+
     public string DraftCommentAuthor
     {
         get => _draftCommentAuthor;
@@ -779,6 +921,18 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     {
         get => _editLabels;
         set => SetProperty(ref _editLabels, value);
+    }
+
+    public string EditMilestoneName
+    {
+        get => _editMilestoneName;
+        set => SetProperty(ref _editMilestoneName, value);
+    }
+
+    public string EditIssueTypeName
+    {
+        get => _editIssueTypeName;
+        set => SetProperty(ref _editIssueTypeName, value);
     }
 
     public IssueStateReason SelectedCloseReason
@@ -877,6 +1031,174 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         set => SetProperty(ref _draftSavedViewGroup, value);
     }
 
+    public string DraftReminderTitle
+    {
+        get => _draftReminderTitle;
+        set
+        {
+            if (SetProperty(ref _draftReminderTitle, value))
+            {
+                ScheduleReminderCommand.NotifyCanExecuteChanged();
+            }
+        }
+    }
+
+    public string DraftReminderNote
+    {
+        get => _draftReminderNote;
+        set => SetProperty(ref _draftReminderNote, value);
+    }
+
+    public DateTimeOffset? DraftReminderAt
+    {
+        get => _draftReminderAt;
+        set
+        {
+            if (SetProperty(ref _draftReminderAt, value))
+            {
+                ScheduleReminderCommand.NotifyCanExecuteChanged();
+            }
+        }
+    }
+
+    public string ExportPresetName
+    {
+        get => _exportPresetName;
+        set
+        {
+            if (SetProperty(ref _exportPresetName, value))
+            {
+                SaveExportPresetCommand.NotifyCanExecuteChanged();
+            }
+        }
+    }
+
+    public ExportSelectionScope DraftExportScope
+    {
+        get => _draftExportScope;
+        set
+        {
+            if (!SetProperty(ref _draftExportScope, value))
+            {
+                return;
+            }
+
+            ExportSelectionCommand.NotifyCanExecuteChanged();
+            SaveExportPresetCommand.NotifyCanExecuteChanged();
+        }
+    }
+
+    public ExportFormat DraftExportFormat
+    {
+        get => _draftExportFormat;
+        set
+        {
+            if (!SetProperty(ref _draftExportFormat, value))
+            {
+                return;
+            }
+
+            ExportSelectionCommand.NotifyCanExecuteChanged();
+            SaveExportPresetCommand.NotifyCanExecuteChanged();
+        }
+    }
+
+    public ExportBodyFormat DraftExportBodyFormat
+    {
+        get => _draftExportBodyFormat;
+        set
+        {
+            if (SetProperty(ref _draftExportBodyFormat, value))
+            {
+                SaveExportPresetCommand.NotifyCanExecuteChanged();
+            }
+        }
+    }
+
+    public bool DraftExportIncludeComments
+    {
+        get => _draftExportIncludeComments;
+        set => SetProperty(ref _draftExportIncludeComments, value);
+    }
+
+    public bool DraftExportIncludeActivity
+    {
+        get => _draftExportIncludeActivity;
+        set => SetProperty(ref _draftExportIncludeActivity, value);
+    }
+
+    public bool DraftExportIncludeAttachments
+    {
+        get => _draftExportIncludeAttachments;
+        set => SetProperty(ref _draftExportIncludeAttachments, value);
+    }
+
+    public bool DraftExportIncludeClosedIssues
+    {
+        get => _draftExportIncludeClosedIssues;
+        set => SetProperty(ref _draftExportIncludeClosedIssues, value);
+    }
+
+    public string LastExportPath
+    {
+        get => _lastExportPath;
+        private set => SetProperty(ref _lastExportPath, value);
+    }
+
+    public string DraftSavedIssueSearchName
+    {
+        get => _draftSavedIssueSearchName;
+        set
+        {
+            if (SetProperty(ref _draftSavedIssueSearchName, value))
+            {
+                SaveIssueSearchCommand.NotifyCanExecuteChanged();
+            }
+        }
+    }
+
+    public bool DraftSavedIssueSearchPinned
+    {
+        get => _draftSavedIssueSearchPinned;
+        set => SetProperty(ref _draftSavedIssueSearchPinned, value);
+    }
+
+    public int DraftRelationTargetIssueNumber
+    {
+        get => _draftRelationTargetIssueNumber;
+        set
+        {
+            if (SetProperty(ref _draftRelationTargetIssueNumber, value))
+            {
+                AddIssueRelationCommand.NotifyCanExecuteChanged();
+            }
+        }
+    }
+
+    public IssueRelationType DraftRelationType
+    {
+        get => _draftRelationType;
+        set => SetProperty(ref _draftRelationType, value);
+    }
+
+    public AppThemePreference SelectedThemePreference
+    {
+        get => _selectedThemePreference;
+        set => SetProperty(ref _selectedThemePreference, value);
+    }
+
+    public bool CompactDensityPreference
+    {
+        get => _compactDensityPreference;
+        set => SetProperty(ref _compactDensityPreference, value);
+    }
+
+    public string ShortcutProfilePreference
+    {
+        get => _shortcutProfilePreference;
+        set => SetProperty(ref _shortcutProfilePreference, value);
+    }
+
     public Task InitializeAsync()
     {
         return LoadAsync();
@@ -927,11 +1249,15 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
                 DraftPriority,
                 DraftDueDate is null ? null : DateOnly.FromDateTime(DraftDueDate.Value.Date),
                 DraftProjectName,
-                ParseLabels(DraftLabels)),
+                ParseLabels(DraftLabels),
+                DraftMilestoneName,
+                DraftIssueTypeName),
             cancellationToken);
 
         DraftTitle = string.Empty;
         DraftLabels = "foundation";
+        DraftMilestoneName = "MVP Readiness";
+        DraftIssueTypeName = "Task";
         DraftPriority = IssuePriority.High;
         DraftDueDate = DateTimeOffset.Now.AddDays(2);
 
@@ -1007,7 +1333,9 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
                 EditPriority,
                 EditDueDate is null ? null : DateOnly.FromDateTime(EditDueDate.Value.Date),
                 EditProjectName,
-                ParseLabels(EditLabels)),
+                ParseLabels(EditLabels),
+                EditMilestoneName,
+                EditIssueTypeName),
             cancellationToken);
 
         await LoadAsync(
@@ -1234,6 +1562,187 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         return Task.CompletedTask;
     }
 
+    private async Task ScheduleReminderAsync(CancellationToken cancellationToken)
+    {
+        if (SelectedIssue is null || DraftReminderAt is null)
+        {
+            return;
+        }
+
+        var reminder = await _workspaceService.ScheduleIssueReminderAsync(
+            new ScheduleIssueReminderInput(
+                SelectedIssue.Id,
+                string.IsNullOrWhiteSpace(DraftReminderTitle)
+                    ? $"Follow up on #{SelectedIssue.Number}"
+                    : DraftReminderTitle,
+                DraftReminderNote,
+                DraftReminderAt.Value.ToUniversalTime()),
+            cancellationToken);
+        if (reminder is null)
+        {
+            DetailStatusMessage = "The reminder could not be scheduled because the selected issue was not found.";
+            return;
+        }
+
+        DraftReminderTitle = string.Empty;
+        DraftReminderNote = string.Empty;
+        DraftReminderAt = DateTimeOffset.Now.AddHours(2);
+        await LoadAsync(SelectedIssue.Id, cancellationToken: cancellationToken);
+        DetailStatusMessage = $"Reminder \"{reminder.Title}\" was scheduled.";
+    }
+
+    private async Task DismissReminderAsync(
+        IssueReminderViewModel? reminder,
+        CancellationToken cancellationToken)
+    {
+        if (reminder is null)
+        {
+            return;
+        }
+
+        var dismissedReminder = await _workspaceService.DismissReminderAsync(
+            new DismissReminderInput(reminder.Id),
+            cancellationToken);
+        if (dismissedReminder is null)
+        {
+            DetailStatusMessage = "The reminder could not be dismissed because it was not found.";
+            return;
+        }
+
+        await LoadAsync(SelectedIssue?.Id, cancellationToken: cancellationToken);
+        DetailStatusMessage = $"Reminder \"{dismissedReminder.Title}\" was dismissed.";
+    }
+
+    private async Task AddIssueRelationAsync(CancellationToken cancellationToken)
+    {
+        if (SelectedIssue is null)
+        {
+            return;
+        }
+
+        var targetIssue = _allIssues.FirstOrDefault(issue => issue.Number == DraftRelationTargetIssueNumber);
+        if (targetIssue is null || targetIssue.Id == SelectedIssue.Id)
+        {
+            DetailStatusMessage = "The relation target could not be found.";
+            return;
+        }
+
+        var relation = await _workspaceService.AddIssueRelationAsync(
+            new AddIssueRelationInput(
+                SelectedIssue.Id,
+                targetIssue.Id,
+                DraftRelationType),
+            cancellationToken);
+        if (relation is null)
+        {
+            DetailStatusMessage = "The issue relation could not be added.";
+            return;
+        }
+
+        DraftRelationTargetIssueNumber = 0;
+        await LoadAsync(SelectedIssue.Id, cancellationToken: cancellationToken);
+        DetailStatusMessage = $"Relation to #{relation.TargetIssueNumber} was added.";
+    }
+
+    private async Task SaveIssueSearchAsync(CancellationToken cancellationToken)
+    {
+        var savedSearch = await _workspaceService.AddSavedIssueSearchAsync(
+            new AddSavedIssueSearchInput(
+                DraftSavedIssueSearchName,
+                SearchText,
+                DraftSavedIssueSearchPinned),
+            cancellationToken);
+        if (savedSearch is null)
+        {
+            StatusMessage = "The saved search could not be stored.";
+            return;
+        }
+
+        DraftSavedIssueSearchName = string.Empty;
+        await LoadAsync(SelectedIssue?.Id, $"Saved search \"{savedSearch.Name}\" was stored.", SelectedProject?.Id, cancellationToken);
+    }
+
+    private Task ApplySavedIssueSearchAsync(
+        SavedIssueSearchViewModel? savedSearch,
+        CancellationToken cancellationToken)
+    {
+        if (savedSearch is null)
+        {
+            return Task.CompletedTask;
+        }
+
+        SearchText = savedSearch.SavedSearch.QueryText;
+        IsProjectsViewActive = false;
+        StatusMessage = $"Saved search \"{savedSearch.SavedSearch.Name}\" applied.";
+        return Task.CompletedTask;
+    }
+
+    private async Task SavePreferencesAsync(CancellationToken cancellationToken)
+    {
+        var preferences = await _workspaceService.UpdateWorkspacePreferencesAsync(
+            new UpdateWorkspacePreferencesInput(
+                SelectedThemePreference,
+                CompactDensityPreference,
+                ShortcutProfilePreference),
+            cancellationToken);
+
+        HydratePreferences(preferences);
+        StatusMessage = $"Preferences saved with {preferences.Theme} theme and {preferences.ShortcutProfile} shortcuts.";
+    }
+
+    private async Task ExportSelectionAsync(CancellationToken cancellationToken)
+    {
+        var result = await _workspaceService.ExportSelectionAsync(
+            BuildCurrentExportOptions(),
+            cancellationToken);
+
+        LastExportPath = result.OutputPath;
+        StatusMessage = $"Exported {result.IssueCount} issues to {result.OutputPath}.";
+    }
+
+    private async Task SaveExportPresetAsync(CancellationToken cancellationToken)
+    {
+        var preset = await _workspaceService.AddExportPresetAsync(
+            new AddExportPresetInput(
+                ExportPresetName,
+                DraftExportScope,
+                DraftExportFormat,
+                DraftExportBodyFormat,
+                DraftExportIncludeComments,
+                DraftExportIncludeActivity,
+                DraftExportIncludeAttachments,
+                DraftExportIncludeClosedIssues),
+            cancellationToken);
+        if (preset is null)
+        {
+            StatusMessage = "The export preset could not be saved.";
+            return;
+        }
+
+        ExportPresetName = string.Empty;
+        await LoadAsync(SelectedIssue?.Id, $"Export preset \"{preset.Name}\" was saved.", SelectedProject?.Id, cancellationToken);
+    }
+
+    private Task ApplyExportPresetAsync(
+        ExportPresetViewModel? preset,
+        CancellationToken cancellationToken)
+    {
+        if (preset is null)
+        {
+            return Task.CompletedTask;
+        }
+
+        DraftExportScope = preset.Preset.Scope;
+        DraftExportFormat = preset.Preset.Format;
+        DraftExportBodyFormat = preset.Preset.BodyFormat;
+        DraftExportIncludeComments = preset.Preset.IncludeComments;
+        DraftExportIncludeActivity = preset.Preset.IncludeActivity;
+        DraftExportIncludeAttachments = preset.Preset.IncludeAttachments;
+        DraftExportIncludeClosedIssues = preset.Preset.IncludeClosedIssues;
+        StatusMessage = $"Export preset \"{preset.Name}\" applied.";
+        return Task.CompletedTask;
+    }
+
     private async Task SaveProjectCustomFieldValueAsync(CancellationToken cancellationToken)
     {
         if (SelectedProject is null || SelectedProjectItemForFields is null || SelectedProjectCustomField is null)
@@ -1305,6 +1814,62 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         return !IsBusy && !IsDetailBusy && attachment is not null;
     }
 
+    private bool CanAddIssueRelation()
+    {
+        return !IsBusy
+            && !IsDetailBusy
+            && SelectedIssue is not null
+            && DraftRelationTargetIssueNumber > 0
+            && DraftRelationTargetIssueNumber != SelectedIssue.Number;
+    }
+
+    private bool CanScheduleReminder()
+    {
+        return !IsBusy
+            && !IsDetailBusy
+            && SelectedIssue is not null
+            && DraftReminderAt is not null;
+    }
+
+    private bool CanDismissReminder(IssueReminderViewModel? reminder)
+    {
+        return !IsBusy && !IsDetailBusy && reminder is not null && !reminder.IsDismissed;
+    }
+
+    private bool CanSaveIssueSearch()
+    {
+        return !IsBusy
+            && !string.IsNullOrWhiteSpace(DraftSavedIssueSearchName)
+            && !string.IsNullOrWhiteSpace(SearchText);
+    }
+
+    private static bool CanApplySavedIssueSearch(SavedIssueSearchViewModel? savedSearch)
+    {
+        return savedSearch is not null;
+    }
+
+    private bool CanExportSelection()
+    {
+        return !IsBusy
+            && (DraftExportScope switch
+            {
+                ExportSelectionScope.CurrentIssue => SelectedIssue is not null,
+                ExportSelectionScope.CurrentFilter => VisibleIssues.Count > 0,
+                ExportSelectionScope.Project => SelectedProject is not null,
+                _ => _allIssues.Count > 0,
+            });
+    }
+
+    private bool CanSaveExportPreset()
+    {
+        return !IsBusy && !string.IsNullOrWhiteSpace(ExportPresetName);
+    }
+
+    private static bool CanApplyExportPreset(ExportPresetViewModel? preset)
+    {
+        return preset is not null;
+    }
+
     private bool CanMoveProjectItemForward(ProjectIssueItemViewModel? item)
     {
         return !IsBusy && !IsProjectBusy && item?.HasNextColumn == true;
@@ -1363,6 +1928,15 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
             AddCommentCommand.NotifyCanExecuteChanged();
             AttachFileCommand.NotifyCanExecuteChanged();
             OpenAttachmentCommand.NotifyCanExecuteChanged();
+            AddIssueRelationCommand.NotifyCanExecuteChanged();
+            ScheduleReminderCommand.NotifyCanExecuteChanged();
+            DismissReminderCommand.NotifyCanExecuteChanged();
+            SaveIssueSearchCommand.NotifyCanExecuteChanged();
+            ApplySavedIssueSearchCommand.NotifyCanExecuteChanged();
+            SavePreferencesCommand.NotifyCanExecuteChanged();
+            ExportSelectionCommand.NotifyCanExecuteChanged();
+            SaveExportPresetCommand.NotifyCanExecuteChanged();
+            ApplyExportPresetCommand.NotifyCanExecuteChanged();
             MoveProjectItemForwardCommand.NotifyCanExecuteChanged();
             MoveProjectItemBackwardCommand.NotifyCanExecuteChanged();
             AddProjectCustomFieldCommand.NotifyCanExecuteChanged();
@@ -1388,6 +1962,10 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
             _allIssues.AddRange(overview.Issues.Select(static issue => new IssueCardViewModel(issue)));
             _allProjects.Clear();
             _allProjects.AddRange(projectSummaries.Select(static project => new ProjectSummaryViewModel(project)));
+            RefreshWorkspaceReminders(overview.Reminders);
+            RefreshExportPresets(overview.ExportPresets);
+            RefreshSavedIssueSearches(overview.SavedIssueSearches);
+            HydratePreferences(overview.Preferences);
 
             ApplyFilters(preferredIssueId);
             ApplyProjects(preferredProjectId ?? SelectedProject?.Id);
@@ -1416,6 +1994,15 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
             AddCommentCommand.NotifyCanExecuteChanged();
             AttachFileCommand.NotifyCanExecuteChanged();
             OpenAttachmentCommand.NotifyCanExecuteChanged();
+            AddIssueRelationCommand.NotifyCanExecuteChanged();
+            ScheduleReminderCommand.NotifyCanExecuteChanged();
+            DismissReminderCommand.NotifyCanExecuteChanged();
+            SaveIssueSearchCommand.NotifyCanExecuteChanged();
+            ApplySavedIssueSearchCommand.NotifyCanExecuteChanged();
+            SavePreferencesCommand.NotifyCanExecuteChanged();
+            ExportSelectionCommand.NotifyCanExecuteChanged();
+            SaveExportPresetCommand.NotifyCanExecuteChanged();
+            ApplyExportPresetCommand.NotifyCanExecuteChanged();
             MoveProjectItemForwardCommand.NotifyCanExecuteChanged();
             MoveProjectItemBackwardCommand.NotifyCanExecuteChanged();
             AddProjectCustomFieldCommand.NotifyCanExecuteChanged();
@@ -1564,10 +2151,10 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
 
     private void ApplyFilters(Guid? preferredIssueId = null)
     {
-        var normalizedSearch = SearchText.Trim();
+        var searchQuery = IssueSearchParser.Parse(SearchText);
         var filteredIssues = _allIssues
             .Where(issue => MatchesScope(issue, ActiveScope))
-            .Where(issue => MatchesSearch(issue, normalizedSearch))
+            .Where(issue => MatchesSearch(issue, searchQuery))
             .ToList();
 
         VisibleIssues.Clear();
@@ -1577,6 +2164,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         }
 
         SelectedIssue = SelectPreferredIssue(filteredIssues, preferredIssueId);
+        ExportSelectionCommand.NotifyCanExecuteChanged();
     }
 
     private void ApplyProjects(Guid? preferredProjectId = null)
@@ -1590,6 +2178,49 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         OnPropertyChanged(nameof(HasProjects));
         OnPropertyChanged(nameof(HasNoProjects));
         SelectedProject = SelectPreferredProject([.. Projects], preferredProjectId);
+    }
+
+    private void RefreshWorkspaceReminders(IReadOnlyList<IssueReminder> reminders)
+    {
+        WorkspaceReminders.Clear();
+        foreach (var reminder in reminders)
+        {
+            WorkspaceReminders.Add(new IssueReminderViewModel(reminder));
+        }
+
+        OnPropertyChanged(nameof(HasWorkspaceReminders));
+        OnPropertyChanged(nameof(HasNoWorkspaceReminders));
+    }
+
+    private void RefreshExportPresets(IReadOnlyList<ExportPreset> presets)
+    {
+        ExportPresets.Clear();
+        foreach (var preset in presets)
+        {
+            ExportPresets.Add(new ExportPresetViewModel(preset));
+        }
+
+        OnPropertyChanged(nameof(HasExportPresets));
+        OnPropertyChanged(nameof(HasNoExportPresets));
+    }
+
+    private void RefreshSavedIssueSearches(IReadOnlyList<SavedIssueSearch> savedSearches)
+    {
+        SavedIssueSearches.Clear();
+        foreach (var savedSearch in savedSearches)
+        {
+            SavedIssueSearches.Add(new SavedIssueSearchViewModel(savedSearch));
+        }
+
+        OnPropertyChanged(nameof(HasSavedIssueSearches));
+        OnPropertyChanged(nameof(HasNoSavedIssueSearches));
+    }
+
+    private void HydratePreferences(WorkspacePreferences preferences)
+    {
+        SelectedThemePreference = preferences.Theme;
+        CompactDensityPreference = preferences.CompactDensity;
+        ShortcutProfilePreference = preferences.ShortcutProfile;
     }
 
     private void ApplyProjectDetail(ProjectDetail detail)
@@ -1720,6 +2351,8 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
             EditDueDate = null;
             EditProjectName = string.Empty;
             EditLabels = string.Empty;
+            EditMilestoneName = string.Empty;
+            EditIssueTypeName = string.Empty;
             SelectedCloseReason = IssueStateReason.Completed;
             return;
         }
@@ -1734,9 +2367,29 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
             : new DateTimeOffset(summary.DueDate.Value.ToDateTime(TimeOnly.MinValue));
         EditProjectName = summary.ProjectName ?? string.Empty;
         EditLabels = string.Join(", ", summary.Labels);
+        EditMilestoneName = summary.MilestoneName ?? string.Empty;
+        EditIssueTypeName = summary.IssueTypeName ?? string.Empty;
         SelectedCloseReason = summary.StateReason == IssueStateReason.None
             ? IssueStateReason.Completed
             : summary.StateReason;
+    }
+
+    private ExportOptions BuildCurrentExportOptions()
+    {
+        // UI는 현재 선택/필터 상태만 알고, 실제 Markdown/HTML/패키지 생성 규칙은 저장소가 담당한다.
+        // 이 경계를 유지해야 export를 통합 테스트로 검증하기 쉽다.
+        return new ExportOptions(
+            DraftExportScope,
+            DraftExportFormat,
+            DraftExportBodyFormat,
+            [.. VisibleIssues.Select(static issue => issue.Id)],
+            SelectedIssue?.Id,
+            SelectedProject?.Id,
+            DraftExportIncludeComments,
+            DraftExportIncludeActivity,
+            DraftExportIncludeAttachments,
+            DraftExportIncludeClosedIssues,
+            null);
     }
 
     private static bool MatchesScope(IssueCardViewModel issue, IssueFilterScope scope) => scope switch
@@ -1746,24 +2399,127 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         _ => true,
     };
 
-    private static bool MatchesSearch(IssueCardViewModel issue, string normalizedSearch)
+    private static bool MatchesSearch(IssueCardViewModel issue, IssueSearchQuery searchQuery)
     {
-        if (string.IsNullOrWhiteSpace(normalizedSearch))
+        if (searchQuery.TextTerms.Count == 0 && searchQuery.Operators.Count == 0)
         {
             return true;
         }
 
-        return issue.Title.Contains(normalizedSearch, StringComparison.OrdinalIgnoreCase)
-            || issue.NumberText.Contains(normalizedSearch, StringComparison.OrdinalIgnoreCase)
-            || issue.AssigneeText.Contains(normalizedSearch, StringComparison.OrdinalIgnoreCase)
-            || issue.ProjectText.Contains(normalizedSearch, StringComparison.OrdinalIgnoreCase)
-            || issue.Labels.Any(label => label.Contains(normalizedSearch, StringComparison.OrdinalIgnoreCase));
+        return searchQuery.TextTerms.All(term => MatchesFreeText(issue, term))
+            && searchQuery.Operators.All(searchOperator => MatchesIssueOperator(issue, searchOperator));
+    }
+
+    private static bool MatchesFreeText(IssueCardViewModel issue, string term)
+    {
+        return issue.Title.Contains(term, StringComparison.OrdinalIgnoreCase)
+            || issue.NumberText.Contains(term, StringComparison.OrdinalIgnoreCase)
+            || issue.AssigneeText.Contains(term, StringComparison.OrdinalIgnoreCase)
+            || issue.ProjectText.Contains(term, StringComparison.OrdinalIgnoreCase)
+            || issue.MilestoneText.Contains(term, StringComparison.OrdinalIgnoreCase)
+            || issue.IssueTypeText.Contains(term, StringComparison.OrdinalIgnoreCase)
+            || issue.PriorityText.Contains(term, StringComparison.OrdinalIgnoreCase)
+            || issue.StateDetailText.Contains(term, StringComparison.OrdinalIgnoreCase)
+            || issue.Labels.Any(label => label.Contains(term, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static bool MatchesIssueOperator(IssueCardViewModel issue, IssueSearchOperator searchOperator)
+    {
+        var matches = searchOperator.Key.ToLowerInvariant() switch
+        {
+            "is" => MatchesIssueStateOperator(issue, searchOperator.Value),
+            "label" => issue.Labels.Any(label => label.Contains(searchOperator.Value, StringComparison.OrdinalIgnoreCase)),
+            "assignee" => MatchesAssigneeOperator(issue, searchOperator.Value),
+            "project" => issue.ProjectText.Contains(searchOperator.Value, StringComparison.OrdinalIgnoreCase),
+            "milestone" => issue.MilestoneText.Contains(searchOperator.Value, StringComparison.OrdinalIgnoreCase),
+            "type" => issue.IssueTypeText.Equals(searchOperator.Value, StringComparison.OrdinalIgnoreCase)
+                || issue.IssueTypeText.Contains(searchOperator.Value, StringComparison.OrdinalIgnoreCase),
+            "priority" => FormatPriorityForFilter(issue.Issue.Priority).Equals(searchOperator.Value, StringComparison.OrdinalIgnoreCase),
+            "reason" => FormatStateReasonForFilter(issue.Issue.StateReason).Equals(searchOperator.Value.Replace("-", "_", StringComparison.Ordinal), StringComparison.OrdinalIgnoreCase),
+            "due" => MatchesDueOperator(issue, searchOperator.Value),
+            "has" => MatchesHasOperator(issue, searchOperator.Value),
+            "no" => !MatchesHasOperator(issue, searchOperator.Value),
+            _ => MatchesFreeText(issue, $"{searchOperator.Key}:{searchOperator.Value}"),
+        };
+
+        return searchOperator.IsNegated ? !matches : matches;
+    }
+
+    private static bool MatchesIssueStateOperator(IssueCardViewModel issue, string value)
+    {
+        return value.Equals("open", StringComparison.OrdinalIgnoreCase)
+            ? issue.IsOpen
+            : value.Equals("closed", StringComparison.OrdinalIgnoreCase)
+                ? issue.IsClosed
+                : value.Equals("overdue", StringComparison.OrdinalIgnoreCase)
+                    ? issue.IsOverdue
+                    : value.Equals("due-today", StringComparison.OrdinalIgnoreCase) && issue.IsDueToday;
+    }
+
+    private static bool MatchesAssigneeOperator(IssueCardViewModel issue, string value)
+    {
+        if (value.Equals("none", StringComparison.OrdinalIgnoreCase))
+        {
+            return !issue.HasAssignee;
+        }
+
+        if (value.Equals("me", StringComparison.OrdinalIgnoreCase))
+        {
+            return issue.HasAssignee;
+        }
+
+        return issue.AssigneeText.Contains(value, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool MatchesDueOperator(IssueCardViewModel issue, string value)
+    {
+        if (value.Equals("none", StringComparison.OrdinalIgnoreCase))
+        {
+            return !issue.HasDueDate;
+        }
+
+        if (value.Equals("today", StringComparison.OrdinalIgnoreCase))
+        {
+            return issue.IsDueToday;
+        }
+
+        if (value.Equals("overdue", StringComparison.OrdinalIgnoreCase))
+        {
+            return issue.IsOverdue;
+        }
+
+        if (value.Equals("upcoming", StringComparison.OrdinalIgnoreCase) || value.Equals("soon", StringComparison.OrdinalIgnoreCase))
+        {
+            var today = DateOnly.FromDateTime(DateTime.Today);
+            return issue.Issue.DueDate is DateOnly dueDate
+                && issue.IsOpen
+                && dueDate > today
+                && dueDate <= today.AddDays(7);
+        }
+
+        return DateOnly.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsedDate)
+            && issue.Issue.DueDate == parsedDate;
+    }
+
+    private static bool MatchesHasOperator(IssueCardViewModel issue, string value)
+    {
+        var normalizedValue = value.Replace("-", string.Empty, StringComparison.OrdinalIgnoreCase);
+        return normalizedValue.ToLowerInvariant() switch
+        {
+            "duedate" => issue.HasDueDate,
+            "assignee" => issue.HasAssignee,
+            "project" => issue.HasProject,
+            "label" or "labels" => issue.HasLabels,
+            "attachment" or "attachments" => issue.HasAttachments,
+            "comment" or "comments" => issue.HasComments,
+            _ => false,
+        };
     }
 
     private static bool MatchesProjectFilter(ProjectIssueItem item, string rawFilter)
     {
-        var tokens = rawFilter.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        if (tokens.Length == 0)
+        var tokens = IssueSearchParser.Tokenize(rawFilter);
+        if (tokens.Count == 0)
         {
             return true;
         }
@@ -1772,6 +2528,15 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     }
 
     private static bool MatchesProjectFilterToken(ProjectIssueItem item, string token)
+    {
+        var isNegated = token[0] == '-' && token.Length > 1;
+        var normalizedToken = isNegated ? token[1..] : token;
+        var matches = MatchesProjectFilterTokenCore(item, normalizedToken.Trim('"'));
+
+        return isNegated ? !matches : matches;
+    }
+
+    private static bool MatchesProjectFilterTokenCore(ProjectIssueItem item, string token)
     {
         if (token.Equals("is:open", StringComparison.OrdinalIgnoreCase))
         {
@@ -1821,8 +2586,51 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
             return (item.AssigneeDisplayName ?? string.Empty).Contains(value, StringComparison.OrdinalIgnoreCase);
         }
 
+        if (key.Equals("reason", StringComparison.OrdinalIgnoreCase))
+        {
+            return FormatStateReasonForFilter(item.StateReason)
+                .Equals(value.Replace("-", "_", StringComparison.Ordinal), StringComparison.OrdinalIgnoreCase);
+        }
+
+        if (key.Equals("due", StringComparison.OrdinalIgnoreCase))
+        {
+            return MatchesProjectDueOperator(item, value);
+        }
+
         return item.CustomFieldValues.TryGetValue(key, out var fieldValue)
             && fieldValue.Contains(value, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool MatchesProjectDueOperator(ProjectIssueItem item, string value)
+    {
+        if (value.Equals("none", StringComparison.OrdinalIgnoreCase))
+        {
+            return item.DueDate is null;
+        }
+
+        if (item.DueDate is not DateOnly dueDate)
+        {
+            return false;
+        }
+
+        var today = DateOnly.FromDateTime(DateTime.Today);
+        if (value.Equals("today", StringComparison.OrdinalIgnoreCase))
+        {
+            return dueDate == today;
+        }
+
+        if (value.Equals("overdue", StringComparison.OrdinalIgnoreCase))
+        {
+            return item.State == IssueWorkflowState.Open && dueDate < today;
+        }
+
+        if (value.Equals("upcoming", StringComparison.OrdinalIgnoreCase) || value.Equals("soon", StringComparison.OrdinalIgnoreCase))
+        {
+            return item.State == IssueWorkflowState.Open && dueDate > today && dueDate <= today.AddDays(7);
+        }
+
+        return DateOnly.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsedDate)
+            && dueDate == parsedDate;
     }
 
     private static void ApplyProjectGroups(
@@ -2126,6 +2934,14 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         IssuePriority.High => "high",
         IssuePriority.Medium => "medium",
         IssuePriority.Low => "low",
+        _ => "none",
+    };
+
+    private static string FormatStateReasonForFilter(IssueStateReason reason) => reason switch
+    {
+        IssueStateReason.Completed => "completed",
+        IssueStateReason.NotPlanned => "not_planned",
+        IssueStateReason.Duplicate => "duplicate",
         _ => "none",
     };
 

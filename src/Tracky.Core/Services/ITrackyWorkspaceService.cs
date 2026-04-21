@@ -1,5 +1,9 @@
 using Tracky.Core.Issues;
+using Tracky.Core.Exports;
+using Tracky.Core.Preferences;
 using Tracky.Core.Projects;
+using Tracky.Core.Reminders;
+using Tracky.Core.Search;
 using Tracky.Core.Workspaces;
 
 namespace Tracky.Core.Services;
@@ -23,6 +27,32 @@ public interface ITrackyWorkspaceService
     Task<IssueAttachment?> AddIssueAttachmentAsync(AddIssueAttachmentInput input, CancellationToken cancellationToken = default);
 
     Task<string?> ExportAttachmentToTempFileAsync(Guid attachmentId, CancellationToken cancellationToken = default);
+
+    Task<IssueRelation?> AddIssueRelationAsync(
+        AddIssueRelationInput input,
+        CancellationToken cancellationToken = default);
+
+    Task<IssueReminder?> ScheduleIssueReminderAsync(
+        ScheduleIssueReminderInput input,
+        CancellationToken cancellationToken = default);
+
+    Task<IssueReminder?> DismissReminderAsync(
+        DismissReminderInput input,
+        CancellationToken cancellationToken = default);
+
+    Task<ExportResult> ExportSelectionAsync(ExportOptions options, CancellationToken cancellationToken = default);
+
+    Task<ExportPreset?> AddExportPresetAsync(
+        AddExportPresetInput input,
+        CancellationToken cancellationToken = default);
+
+    Task<SavedIssueSearch?> AddSavedIssueSearchAsync(
+        AddSavedIssueSearchInput input,
+        CancellationToken cancellationToken = default);
+
+    Task<WorkspacePreferences> UpdateWorkspacePreferencesAsync(
+        UpdateWorkspacePreferencesInput input,
+        CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<ProjectSummary>> GetProjectsAsync(CancellationToken cancellationToken = default);
 

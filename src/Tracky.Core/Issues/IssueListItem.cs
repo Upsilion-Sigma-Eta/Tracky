@@ -13,7 +13,9 @@ public sealed record IssueListItem(
     string? ProjectName,
     int CommentCount,
     int AttachmentCount,
-    IReadOnlyList<string> Labels)
+    IReadOnlyList<string> Labels,
+    string? MilestoneName = null,
+    string? IssueTypeName = null)
 {
     public static readonly IReadOnlyList<string> EmptyLabels = [];
 }

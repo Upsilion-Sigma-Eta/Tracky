@@ -1,6 +1,8 @@
 using Tracky.App.Tests.TestDoubles;
 using Tracky.App.ViewModels;
+using Tracky.Core.Exports;
 using Tracky.Core.Issues;
+using Tracky.Core.Preferences;
 using Tracky.Core.Projects;
 
 namespace Tracky.App.Tests;
@@ -65,6 +67,154 @@ public sealed class MainWindowViewModelTests
         Assert.Empty(viewModel.VisibleIssues);
         Assert.Null(viewModel.SelectedIssue);
         Assert.Null(viewModel.SelectedIssueDetail);
+    }
+
+    [Fact]
+    public async Task Phase3_advanced_search_matches_state_label_reason_due_and_negated_operators()
+    {
+        var viewModel = CreateViewModel(out _, out _);
+
+        await viewModel.InitializeAsync();
+        await TestWaiter.UntilAsync(
+            () => viewModel.SelectedIssueDetail is not null,
+            "The selected issue detail was not loaded before Phase 3 search ran.");
+
+        viewModel.SearchText = "is:open label:desktop due:today";
+        Assert.Single(viewModel.VisibleIssues);
+        Assert.Equal("Prepare GUI test coverage for quick capture", viewModel.VisibleIssues[0].Title);
+
+        viewModel.SearchText = "is:closed reason:completed";
+        Assert.Single(viewModel.VisibleIssues);
+        Assert.True(viewModel.VisibleIssues[0].IsClosed);
+
+        viewModel.SearchText = "-label:desktop assignee:me";
+        Assert.Single(viewModel.VisibleIssues);
+        Assert.DoesNotContain("desktop", viewModel.VisibleIssues[0].Labels);
+    }
+
+    [Fact]
+    public async Task Phase3_metadata_relations_saved_searches_and_preferences_flow_through_commands()
+    {
+        var viewModel = CreateViewModel(out _, out _);
+
+        await viewModel.InitializeAsync();
+        await TestWaiter.UntilAsync(
+            () => viewModel.SelectedIssueDetail is not null,
+            "The selected issue detail was not loaded before Phase 3 command coverage ran.");
+
+        viewModel.DraftTitle = "Phase 3 relation target";
+        viewModel.DraftProjectName = "Tracky Phase 3";
+        viewModel.DraftLabels = "phase3, relation";
+        viewModel.DraftMilestoneName = "Phase 3 Validation";
+        viewModel.DraftIssueTypeName = "Task";
+        await viewModel.CreateIssueCommand.ExecuteAsync();
+        await TestWaiter.UntilAsync(
+            () => viewModel.SelectedIssue?.Title == "Phase 3 relation target",
+            "The relation target issue was not created and selected.");
+        var targetIssueNumber = viewModel.SelectedIssue!.Number;
+
+        viewModel.DraftTitle = "Phase 3 metadata command flow";
+        viewModel.DraftProjectName = "Tracky Phase 3";
+        viewModel.DraftLabels = "phase3, metadata";
+        viewModel.DraftMilestoneName = "Phase 3 Validation";
+        viewModel.DraftIssueTypeName = "Bug";
+        await viewModel.CreateIssueCommand.ExecuteAsync();
+        await TestWaiter.UntilAsync(
+            () => viewModel.SelectedIssueDetail?.Summary.Title == "Phase 3 metadata command flow",
+            "The metadata issue was not selected with detail loaded.");
+
+        Assert.Equal("Phase 3 Validation", viewModel.SelectedIssue!.MilestoneText);
+        Assert.Equal("Bug", viewModel.SelectedIssue.IssueTypeText);
+
+        viewModel.SearchText = "milestone:Validation type:Bug";
+        Assert.Single(viewModel.VisibleIssues);
+        Assert.Equal("Phase 3 metadata command flow", viewModel.VisibleIssues[0].Title);
+
+        viewModel.DraftRelationTargetIssueNumber = targetIssueNumber;
+        viewModel.DraftRelationType = IssueRelationType.BlockedBy;
+        await viewModel.AddIssueRelationCommand.ExecuteAsync();
+        await TestWaiter.UntilAsync(
+            () => viewModel.SelectedIssueDetail?.Relations.Any(relation => relation.Relation.TargetIssueNumber == targetIssueNumber) == true,
+            "The issue relation was not added and reloaded into the selected detail.");
+        Assert.Contains("Relation to", viewModel.DetailStatusMessage, StringComparison.OrdinalIgnoreCase);
+
+        viewModel.DraftSavedIssueSearchName = "Phase 3 validation bugs";
+        await viewModel.SaveIssueSearchCommand.ExecuteAsync();
+        await TestWaiter.UntilAsync(
+            () => viewModel.SavedIssueSearches.Any(search => search.QueryText == "milestone:Validation type:Bug"),
+            "The saved issue search was not reloaded after saving.");
+
+        viewModel.SearchText = string.Empty;
+        var savedSearch = viewModel.SavedIssueSearches.Single(search => search.QueryText == "milestone:Validation type:Bug");
+        await viewModel.ApplySavedIssueSearchCommand.ExecuteAsync(savedSearch);
+        Assert.Equal("milestone:Validation type:Bug", viewModel.SearchText);
+        Assert.Single(viewModel.VisibleIssues);
+
+        viewModel.SelectedThemePreference = AppThemePreference.Dark;
+        viewModel.CompactDensityPreference = false;
+        viewModel.ShortcutProfilePreference = "Vim";
+        await viewModel.SavePreferencesCommand.ExecuteAsync();
+
+        Assert.Equal(AppThemePreference.Dark, viewModel.SelectedThemePreference);
+        Assert.False(viewModel.CompactDensityPreference);
+        Assert.Equal("Vim", viewModel.ShortcutProfilePreference);
+        Assert.Contains("Preferences saved", viewModel.StatusMessage, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task Phase3_reminder_commands_schedule_and_dismiss_the_selected_issue_reminder()
+    {
+        var viewModel = CreateViewModel(out _, out _);
+
+        await viewModel.InitializeAsync();
+        await TestWaiter.UntilAsync(
+            () => viewModel.SelectedIssueDetail is not null,
+            "The selected issue detail was not loaded before reminder commands ran.");
+
+        viewModel.DraftReminderTitle = "Review reminder command flow";
+        viewModel.DraftReminderNote = "This reminder is scheduled through the ViewModel command.";
+        viewModel.DraftReminderAt = DateTimeOffset.Now.AddHours(4);
+
+        await viewModel.ScheduleReminderCommand.ExecuteAsync();
+        await TestWaiter.UntilAsync(
+            () => viewModel.SelectedIssueDetail?.Reminders.Any(reminder => reminder.Title == "Review reminder command flow") == true,
+            "The scheduled reminder did not appear on the selected issue detail.");
+
+        var reminder = viewModel.SelectedIssueDetail!.Reminders.Single(item => item.Title == "Review reminder command flow");
+        await viewModel.DismissReminderCommand.ExecuteAsync(reminder);
+        await TestWaiter.UntilAsync(
+            () => viewModel.SelectedIssueDetail?.Reminders.Any(item => item.Id == reminder.Id && item.IsDismissed) == true,
+            "The reminder was not dismissed on the selected issue detail.");
+
+        Assert.Contains("dismissed", viewModel.DetailStatusMessage, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task Phase3_export_commands_write_selection_and_store_presets()
+    {
+        var viewModel = CreateViewModel(out _, out _);
+
+        await viewModel.InitializeAsync();
+        await TestWaiter.UntilAsync(
+            () => viewModel.SelectedIssueDetail is not null,
+            "The selected issue detail was not loaded before export commands ran.");
+
+        viewModel.SearchText = "is:open";
+        viewModel.DraftExportScope = ExportSelectionScope.CurrentFilter;
+        viewModel.DraftExportFormat = ExportFormat.Markdown;
+        viewModel.DraftExportBodyFormat = ExportBodyFormat.Markdown;
+        viewModel.DraftExportIncludeComments = true;
+        viewModel.DraftExportIncludeActivity = true;
+
+        await viewModel.ExportSelectionCommand.ExecuteAsync();
+        Assert.True(File.Exists(viewModel.LastExportPath));
+        Assert.Contains("Exported", viewModel.StatusMessage, StringComparison.OrdinalIgnoreCase);
+
+        viewModel.ExportPresetName = "Open issue markdown";
+        await viewModel.SaveExportPresetCommand.ExecuteAsync();
+        await TestWaiter.UntilAsync(
+            () => viewModel.ExportPresets.Any(preset => preset.Name == "Open issue markdown"),
+            "The export preset was not reloaded after saving.");
     }
 
     [Fact]

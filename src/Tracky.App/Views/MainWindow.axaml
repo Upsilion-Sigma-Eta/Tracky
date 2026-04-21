@@ -16,6 +16,14 @@
         Background="{StaticResource TrackyCanvasBrush}"
         Icon="/Assets/avalonia-logo.ico"
         Title="Tracky">
+    <Window.KeyBindings>
+        <KeyBinding Gesture="Ctrl+1" Command="{Binding ShowIssuesCommand}" />
+        <KeyBinding Gesture="Ctrl+2" Command="{Binding ShowProjectsCommand}" />
+        <KeyBinding Gesture="Ctrl+R" Command="{Binding RefreshCommand}" />
+        <KeyBinding Gesture="Ctrl+N" Command="{Binding CreateIssueCommand}" />
+        <KeyBinding Gesture="Ctrl+E" Command="{Binding ExportSelectionCommand}" />
+    </Window.KeyBindings>
+
     <Window.Styles>
         <Style Selector="Border.surface">
             <Setter Property="Background" Value="{StaticResource TrackySurfaceBrush}" />
@@ -135,7 +143,7 @@
         <!-- 왼쪽 앱 셸은 이후 Projects, Labels, Saved Views를 붙일 수 있도록 구조만 먼저 고정한다. -->
         <Border Grid.Column="0"
                 Background="{StaticResource TrackyNavBrush}"
-                CornerRadius="28"
+                CornerRadius="12"
                 Padding="20">
             <Grid RowDefinitions="Auto,Auto,*,Auto" RowSpacing="18">
                 <StackPanel Spacing="4">
@@ -143,7 +151,7 @@
                                FontSize="30"
                                FontWeight="Black"
                                Foreground="{StaticResource TrackyNavInkBrush}" />
-                    <TextBlock Text="Phase 2 Project Core"
+                    <TextBlock Text="Phase 3 Productivity"
                                Foreground="{StaticResource TrackyNavMutedInkBrush}" />
                 </StackPanel>
 
@@ -151,7 +159,7 @@
                         Background="#222222"
                         BorderBrush="#323232"
                         BorderThickness="1"
-                        CornerRadius="22"
+                        CornerRadius="10"
                         Padding="16">
                     <StackPanel Spacing="8">
                         <TextBlock Text="{Binding WorkspaceName}"
@@ -186,7 +194,7 @@
                         Background="#222222"
                         BorderBrush="#323232"
                         BorderThickness="1"
-                        CornerRadius="22"
+                        CornerRadius="10"
                         Padding="16">
                     <StackPanel Spacing="6">
                         <TextBlock Text="Local-first workspace"
@@ -220,7 +228,7 @@
                     <StackPanel Grid.Column="1" Spacing="12" Width="360">
                         <TextBox x:Name="SearchBox"
                                  Classes="search-box"
-                                 Watermark="Search title, label, assignee, project, or #issue"
+                                 Watermark="Search with is:open label:bug assignee:me due:today"
                                  Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}" />
                         <Button x:Name="RefreshWorkspaceButton"
                                 Classes="secondary"
@@ -298,7 +306,7 @@
                                 <Border Background="{StaticResource TrackySurfaceStrongBrush}"
                                         BorderBrush="{Binding CardBorderBrush}"
                                         BorderThickness="1"
-                                        CornerRadius="22"
+                                        CornerRadius="10"
                                         Padding="18">
                                     <StackPanel Spacing="14">
                                         <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="10">
@@ -355,6 +363,8 @@
                                             <TextBlock Classes="muted" Margin="0,0,16,0" Text="{Binding StateDetailText}" />
                                             <TextBlock Classes="muted" Margin="0,0,16,0" Text="{Binding AssigneeText}" />
                                             <TextBlock Classes="muted" Margin="0,0,16,0" Text="{Binding ProjectText}" />
+                                            <TextBlock Classes="muted" Margin="0,0,16,0" Text="{Binding MilestoneText}" />
+                                            <TextBlock Classes="muted" Margin="0,0,16,0" Text="{Binding IssueTypeText}" />
                                             <TextBlock Classes="muted"
                                                        Margin="0,0,16,0"
                                                        IsVisible="{Binding HasComments}"
@@ -367,7 +377,7 @@
                                         </WrapPanel>
 
                                         <Border Background="{Binding DueBadgeBackground}"
-                                                CornerRadius="14"
+                                                CornerRadius="8"
                                                 Padding="12,8"
                                                 HorizontalAlignment="Left"
                                                 IsVisible="{Binding HasDueDate}">
@@ -551,7 +561,7 @@
                                                         <Border Background="#FFFDF8"
                                                                 BorderBrush="{StaticResource TrackyBorderBrush}"
                                                                 BorderThickness="1"
-                                                                CornerRadius="16"
+                                                                CornerRadius="8"
                                                                 Margin="0,0,0,10"
                                                                 Padding="14">
                                                             <StackPanel Spacing="10">
@@ -619,7 +629,7 @@
                                                     <Border Background="{StaticResource TrackySurfaceStrongBrush}"
                                                             BorderBrush="{StaticResource TrackyBorderBrush}"
                                                             BorderThickness="1"
-                                                            CornerRadius="16"
+                                                            CornerRadius="8"
                                                             Margin="0,0,0,10"
                                                             Padding="14">
                                                         <Grid ColumnDefinitions="90,*,120,130,110,180" ColumnSpacing="12">
@@ -661,7 +671,7 @@
                                                     <Border Background="{StaticResource TrackySurfaceStrongBrush}"
                                                             BorderBrush="{StaticResource TrackyBorderBrush}"
                                                             BorderThickness="1"
-                                                            CornerRadius="16"
+                                                            CornerRadius="8"
                                                             Margin="0,0,0,10"
                                                             Padding="14">
                                                         <Grid ColumnDefinitions="140,*,140" ColumnSpacing="12">
@@ -700,7 +710,7 @@
                                                     <Border Background="{StaticResource TrackySurfaceStrongBrush}"
                                                             BorderBrush="{StaticResource TrackyBorderBrush}"
                                                             BorderThickness="1"
-                                                            CornerRadius="16"
+                                                            CornerRadius="8"
                                                             Margin="0,0,0,10"
                                                             Padding="14">
                                                         <Grid ColumnDefinitions="170,*,120" ColumnSpacing="12">
@@ -737,7 +747,7 @@
                     <Border Background="{StaticResource TrackySurfaceStrongBrush}"
                             BorderBrush="{StaticResource TrackyBorderBrush}"
                             BorderThickness="1"
-                            CornerRadius="22"
+                            CornerRadius="10"
                             Padding="18"
                             IsVisible="{Binding IsProjectsViewActive}">
                         <StackPanel Spacing="14">
@@ -768,7 +778,7 @@
                     <Border Background="{StaticResource TrackySurfaceStrongBrush}"
                             BorderBrush="{StaticResource TrackyBorderBrush}"
                             BorderThickness="1"
-                            CornerRadius="22"
+                            CornerRadius="10"
                             Padding="18"
                             IsVisible="{Binding IsProjectsViewActive}">
                         <StackPanel Spacing="14">
@@ -801,7 +811,7 @@
                     <Border Background="{StaticResource TrackySurfaceStrongBrush}"
                             BorderBrush="{StaticResource TrackyBorderBrush}"
                             BorderThickness="1"
-                            CornerRadius="22"
+                            CornerRadius="10"
                             Padding="18"
                             IsVisible="{Binding IsProjectsViewActive}">
                         <StackPanel Spacing="14">
@@ -813,7 +823,7 @@
                                         <Border Background="#FFFDF8"
                                                 BorderBrush="{StaticResource TrackyBorderBrush}"
                                                 BorderThickness="1"
-                                                CornerRadius="14"
+                                                CornerRadius="8"
                                                 Margin="0,0,0,8"
                                                 Padding="12">
                                             <StackPanel Spacing="4">
@@ -854,7 +864,7 @@
                     <Border Background="{StaticResource TrackySurfaceStrongBrush}"
                             BorderBrush="{StaticResource TrackyBorderBrush}"
                             BorderThickness="1"
-                            CornerRadius="22"
+                            CornerRadius="10"
                             Padding="18"
                             IsVisible="{Binding IsProjectsViewActive}">
                         <StackPanel Spacing="14">
@@ -866,7 +876,7 @@
                                         <Border Background="#FFFDF8"
                                                 BorderBrush="{StaticResource TrackyBorderBrush}"
                                                 BorderThickness="1"
-                                                CornerRadius="14"
+                                                CornerRadius="8"
                                                 Margin="0,0,0,8"
                                                 Padding="12">
                                             <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
@@ -928,7 +938,238 @@
                     <Border Background="{StaticResource TrackySurfaceStrongBrush}"
                             BorderBrush="{StaticResource TrackyBorderBrush}"
                             BorderThickness="1"
-                            CornerRadius="22"
+                            CornerRadius="10"
+                            Padding="18"
+                            IsVisible="{Binding IsIssuesViewActive}">
+                        <StackPanel Spacing="14">
+                            <TextBlock Classes="section-title" Text="Reminders" />
+
+                            <TextBlock Classes="muted"
+                                       IsVisible="{Binding HasNoWorkspaceReminders}"
+                                       Text="No active reminders." />
+
+                            <ItemsControl ItemsSource="{Binding WorkspaceReminders}"
+                                          IsVisible="{Binding HasWorkspaceReminders}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:IssueReminderViewModel">
+                                        <Border Background="#FFFDF8"
+                                                BorderBrush="{StaticResource TrackyBorderBrush}"
+                                                BorderThickness="1"
+                                                CornerRadius="8"
+                                                Margin="0,0,0,8"
+                                                Padding="12">
+                                            <StackPanel Spacing="6">
+                                                <WrapPanel>
+                                                    <Border Background="{Binding StatusBadgeBackground}"
+                                                            CornerRadius="999"
+                                                            Margin="0,0,8,0"
+                                                            Padding="8,3">
+                                                        <TextBlock Text="{Binding StatusText}"
+                                                                   Foreground="{Binding StatusBadgeForeground}"
+                                                                   FontWeight="SemiBold" />
+                                                    </Border>
+                                                    <TextBlock Classes="muted"
+                                                               Margin="0,4,0,0"
+                                                               Text="{Binding RemindAtText}" />
+                                                </WrapPanel>
+                                                <TextBlock Text="{Binding Title}"
+                                                           FontWeight="SemiBold"
+                                                           Foreground="{StaticResource TrackyInkBrush}"
+                                                           TextWrapping="Wrap" />
+                                                <TextBlock Classes="muted"
+                                                           Text="{Binding Note}"
+                                                           TextWrapping="Wrap" />
+                                            </StackPanel>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+
+                            <TextBlock Classes="muted" Text="Title" />
+                            <TextBox Watermark="Follow up on selected issue"
+                                     Text="{Binding DraftReminderTitle, UpdateSourceTrigger=PropertyChanged}" />
+
+                            <TextBlock Classes="muted" Text="Note" />
+                            <TextBox Watermark="What should be remembered?"
+                                     Text="{Binding DraftReminderNote}" />
+
+                            <TextBlock Classes="muted" Text="Remind at" />
+                            <DatePicker SelectedDate="{Binding DraftReminderAt}" />
+
+                            <Button x:Name="ScheduleReminderButton"
+                                    Classes="secondary"
+                                    Command="{Binding ScheduleReminderCommand}"
+                                    Content="Schedule reminder" />
+                        </StackPanel>
+                    </Border>
+
+                    <Border Background="{StaticResource TrackySurfaceStrongBrush}"
+                            BorderBrush="{StaticResource TrackyBorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="10"
+                            Padding="18"
+                            IsVisible="{Binding IsIssuesViewActive}">
+                        <StackPanel Spacing="14">
+                            <!-- 저장 검색은 현재 필터 문자열을 이름과 함께 보존해 반복적인 triage 흐름을 빠르게 재사용한다. -->
+                            <TextBlock Classes="section-title" Text="Saved Searches" />
+
+                            <TextBlock Classes="muted"
+                                       IsVisible="{Binding HasNoSavedIssueSearches}"
+                                       Text="No saved search has been stored." />
+
+                            <ItemsControl ItemsSource="{Binding SavedIssueSearches}"
+                                          IsVisible="{Binding HasSavedIssueSearches}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:SavedIssueSearchViewModel">
+                                        <Border Background="#FFFDF8"
+                                                BorderBrush="{StaticResource TrackyBorderBrush}"
+                                                BorderThickness="1"
+                                                CornerRadius="8"
+                                                Margin="0,0,0,8"
+                                                Padding="12">
+                                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                                                <StackPanel Spacing="4">
+                                                    <TextBlock Text="{Binding Name}"
+                                                               FontWeight="SemiBold"
+                                                               Foreground="{StaticResource TrackyInkBrush}" />
+                                                    <TextBlock Classes="muted"
+                                                               Text="{Binding QueryText}"
+                                                               TextWrapping="Wrap" />
+                                                </StackPanel>
+                                                <Button Grid.Column="1"
+                                                        Classes="secondary"
+                                                        Command="{Binding #RootWindow.((vm:MainWindowViewModel)DataContext).ApplySavedIssueSearchCommand}"
+                                                        CommandParameter="{Binding}"
+                                                        Content="Apply" />
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+
+                            <TextBlock Classes="muted" Text="Search name" />
+                            <TextBox Watermark="Open desktop work"
+                                     Text="{Binding DraftSavedIssueSearchName, UpdateSourceTrigger=PropertyChanged}" />
+
+                            <CheckBox Content="Pinned"
+                                      IsChecked="{Binding DraftSavedIssueSearchPinned}" />
+
+                            <Button x:Name="SaveIssueSearchButton"
+                                    Classes="secondary"
+                                    Command="{Binding SaveIssueSearchCommand}"
+                                    Content="Save current search" />
+                        </StackPanel>
+                    </Border>
+
+                    <Border Background="{StaticResource TrackySurfaceStrongBrush}"
+                            BorderBrush="{StaticResource TrackyBorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="10"
+                            Padding="18"
+                            IsVisible="{Binding IsIssuesViewActive}">
+                        <StackPanel Spacing="14">
+                            <TextBlock Classes="section-title" Text="Export" />
+
+                            <ItemsControl ItemsSource="{Binding ExportPresets}"
+                                          IsVisible="{Binding HasExportPresets}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:ExportPresetViewModel">
+                                        <Border Background="#FFFDF8"
+                                                BorderBrush="{StaticResource TrackyBorderBrush}"
+                                                BorderThickness="1"
+                                                CornerRadius="8"
+                                                Margin="0,0,0,8"
+                                                Padding="12">
+                                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                                                <StackPanel Spacing="4">
+                                                    <TextBlock Text="{Binding Name}"
+                                                               FontWeight="SemiBold"
+                                                               Foreground="{StaticResource TrackyInkBrush}" />
+                                                    <TextBlock Classes="muted"
+                                                               Text="{Binding Summary}" />
+                                                </StackPanel>
+                                                <Button Grid.Column="1"
+                                                        Classes="secondary"
+                                                        Command="{Binding #RootWindow.((vm:MainWindowViewModel)DataContext).ApplyExportPresetCommand}"
+                                                        CommandParameter="{Binding}"
+                                                        Content="Apply" />
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+
+                            <TextBlock Classes="muted" Text="Scope" />
+                            <ComboBox ItemsSource="{Binding AvailableExportScopes}"
+                                      SelectedItem="{Binding DraftExportScope}" />
+
+                            <TextBlock Classes="muted" Text="Format" />
+                            <ComboBox ItemsSource="{Binding AvailableExportFormats}"
+                                      SelectedItem="{Binding DraftExportFormat}" />
+
+                            <TextBlock Classes="muted" Text="Body" />
+                            <ComboBox ItemsSource="{Binding AvailableExportBodyFormats}"
+                                      SelectedItem="{Binding DraftExportBodyFormat}" />
+
+                            <CheckBox Content="Comments"
+                                      IsChecked="{Binding DraftExportIncludeComments}" />
+                            <CheckBox Content="Activity"
+                                      IsChecked="{Binding DraftExportIncludeActivity}" />
+                            <CheckBox Content="Attachments"
+                                      IsChecked="{Binding DraftExportIncludeAttachments}" />
+                            <CheckBox Content="Closed issues"
+                                      IsChecked="{Binding DraftExportIncludeClosedIssues}" />
+
+                            <Button x:Name="ExportSelectionButton"
+                                    Classes="primary"
+                                    Command="{Binding ExportSelectionCommand}"
+                                    Content="Export selection" />
+
+                            <TextBlock Classes="muted" Text="Preset name" />
+                            <TextBox Watermark="Weekly Markdown handoff"
+                                     Text="{Binding ExportPresetName, UpdateSourceTrigger=PropertyChanged}" />
+                            <Button x:Name="SaveExportPresetButton"
+                                    Classes="secondary"
+                                    Command="{Binding SaveExportPresetCommand}"
+                                    Content="Save export preset" />
+                            <TextBlock Classes="mono"
+                                       Text="{Binding LastExportPath}"
+                                       TextWrapping="Wrap" />
+                        </StackPanel>
+                    </Border>
+
+                    <Border Background="{StaticResource TrackySurfaceStrongBrush}"
+                            BorderBrush="{StaticResource TrackyBorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="10"
+                            Padding="18"
+                            IsVisible="{Binding IsIssuesViewActive}">
+                        <StackPanel Spacing="14">
+                            <!-- 환경설정은 DB에 저장되는 워크스페이스 단위 선호값을 직접 편집하게 해 Phase3 개인화 요구를 검증한다. -->
+                            <TextBlock Classes="section-title" Text="Preferences" />
+
+                            <TextBlock Classes="muted" Text="Theme" />
+                            <ComboBox ItemsSource="{Binding AvailableThemePreferences}"
+                                      SelectedItem="{Binding SelectedThemePreference}" />
+
+                            <CheckBox Content="Compact density"
+                                      IsChecked="{Binding CompactDensityPreference}" />
+
+                            <TextBlock Classes="muted" Text="Shortcut profile" />
+                            <TextBox Watermark="Default"
+                                     Text="{Binding ShortcutProfilePreference}" />
+
+                            <Button x:Name="SavePreferencesButton"
+                                    Classes="secondary"
+                                    Command="{Binding SavePreferencesCommand}"
+                                    Content="Save preferences" />
+                        </StackPanel>
+                    </Border>
+
+                    <Border Background="{StaticResource TrackySurfaceStrongBrush}"
+                            BorderBrush="{StaticResource TrackyBorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="10"
                             Padding="18"
                             IsVisible="{Binding IsQuickCaptureVisible}">
                         <StackPanel Spacing="14">
@@ -956,6 +1197,15 @@
                             <TextBox Watermark="Tracky Foundation"
                                      Text="{Binding DraftProjectName}" />
 
+                            <!-- Phase3 메타데이터는 생성 시점부터 저장해 검색, 프로젝트 동기화, 내보내기에서 같은 값을 사용한다. -->
+                            <TextBlock Classes="muted" Text="Milestone" />
+                            <TextBox Watermark="MVP Readiness"
+                                     Text="{Binding DraftMilestoneName}" />
+
+                            <TextBlock Classes="muted" Text="Issue type" />
+                            <TextBox Watermark="Task"
+                                     Text="{Binding DraftIssueTypeName}" />
+
                             <TextBlock Classes="muted" Text="Labels" />
                             <TextBox Watermark="foundation, desktop, ux"
                                      Text="{Binding DraftLabels}" />
@@ -970,7 +1220,7 @@
                     <Border Background="{StaticResource TrackySurfaceStrongBrush}"
                             BorderBrush="{StaticResource TrackyBorderBrush}"
                             BorderThickness="1"
-                            CornerRadius="22"
+                            CornerRadius="10"
                             Padding="18"
                             IsVisible="{Binding IsIssueEditorVisible}">
                         <StackPanel Spacing="14">
@@ -1007,6 +1257,15 @@
                             <TextBox Watermark="Tracky Foundation"
                                      Text="{Binding EditProjectName}" />
 
+                            <!-- 편집 폼도 생성 폼과 같은 Phase3 메타데이터를 다뤄 저장 후 상세/필터 상태가 어긋나지 않게 한다. -->
+                            <TextBlock Classes="muted" Text="Milestone" />
+                            <TextBox Watermark="MVP Readiness"
+                                     Text="{Binding EditMilestoneName}" />
+
+                            <TextBlock Classes="muted" Text="Issue type" />
+                            <TextBox Watermark="Bug"
+                                     Text="{Binding EditIssueTypeName}" />
+
                             <TextBlock Classes="muted" Text="Labels" />
                             <TextBox Watermark="foundation, desktop, ux"
                                      Text="{Binding EditLabels}" />
@@ -1036,7 +1295,7 @@
                     <Border Background="{StaticResource TrackySurfaceStrongBrush}"
                             BorderBrush="{StaticResource TrackyBorderBrush}"
                             BorderThickness="1"
-                            CornerRadius="22"
+                            CornerRadius="10"
                             Padding="18"
                             IsVisible="{Binding IsIssuesViewActive}">
                         <StackPanel Spacing="10">
@@ -1051,7 +1310,7 @@
                     <Border Background="{StaticResource TrackySurfaceStrongBrush}"
                             BorderBrush="{StaticResource TrackyBorderBrush}"
                             BorderThickness="1"
-                            CornerRadius="22"
+                            CornerRadius="10"
                             Padding="18"
                             IsVisible="{Binding IsIssueDetailPlaceholderVisible}">
                         <StackPanel Spacing="10">
@@ -1070,7 +1329,7 @@
                                     <Border Background="{StaticResource TrackySurfaceStrongBrush}"
                                             BorderBrush="{StaticResource TrackyBorderBrush}"
                                             BorderThickness="1"
-                                            CornerRadius="22"
+                                            CornerRadius="10"
                                             Padding="18">
                                         <StackPanel Spacing="14">
                                             <TextBlock Classes="section-title" Text="Issue Details" />
@@ -1112,7 +1371,7 @@
                                                 </Border>
                                             </WrapPanel>
 
-                                            <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="10">
+                                            <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="10">
                                                 <TextBlock Grid.Row="0" Grid.Column="0" Classes="muted" Text="State detail" />
                                                 <TextBlock Grid.Row="0" Grid.Column="1" Classes="body" Text="{Binding Summary.StateDetailText}" />
 
@@ -1122,11 +1381,17 @@
                                                 <TextBlock Grid.Row="2" Grid.Column="0" Classes="muted" Text="Project" />
                                                 <TextBlock Grid.Row="2" Grid.Column="1" Classes="body" Text="{Binding Summary.ProjectText}" />
 
-                                                <TextBlock Grid.Row="3" Grid.Column="0" Classes="muted" Text="Comments" />
-                                                <TextBlock Grid.Row="3" Grid.Column="1" Classes="body" Text="{Binding CommentCountText}" />
+                                                <TextBlock Grid.Row="3" Grid.Column="0" Classes="muted" Text="Milestone" />
+                                                <TextBlock Grid.Row="3" Grid.Column="1" Classes="body" Text="{Binding Summary.MilestoneText}" />
 
-                                                <TextBlock Grid.Row="4" Grid.Column="0" Classes="muted" Text="Attachments" />
-                                                <TextBlock Grid.Row="4" Grid.Column="1" Classes="body" Text="{Binding AttachmentCountText}" />
+                                                <TextBlock Grid.Row="4" Grid.Column="0" Classes="muted" Text="Issue type" />
+                                                <TextBlock Grid.Row="4" Grid.Column="1" Classes="body" Text="{Binding Summary.IssueTypeText}" />
+
+                                                <TextBlock Grid.Row="5" Grid.Column="0" Classes="muted" Text="Comments" />
+                                                <TextBlock Grid.Row="5" Grid.Column="1" Classes="body" Text="{Binding CommentCountText}" />
+
+                                                <TextBlock Grid.Row="6" Grid.Column="0" Classes="muted" Text="Attachments" />
+                                                <TextBlock Grid.Row="6" Grid.Column="1" Classes="body" Text="{Binding AttachmentCountText}" />
                                             </Grid>
 
                                             <ItemsControl ItemsSource="{Binding Summary.Labels}"
@@ -1160,7 +1425,7 @@
                                     <Border Background="{StaticResource TrackySurfaceStrongBrush}"
                                             BorderBrush="{StaticResource TrackyBorderBrush}"
                                             BorderThickness="1"
-                                            CornerRadius="22"
+                                            CornerRadius="10"
                                             Padding="18">
                                         <StackPanel Spacing="12">
                                             <TextBlock Classes="section-title" Text="Description" />
@@ -1173,7 +1438,70 @@
                                     <Border Background="{StaticResource TrackySurfaceStrongBrush}"
                                             BorderBrush="{StaticResource TrackyBorderBrush}"
                                             BorderThickness="1"
-                                            CornerRadius="22"
+                                            CornerRadius="10"
+                                            Padding="18">
+                                        <StackPanel Spacing="12">
+                                            <!-- 관계는 Phase3의 의존성/중복/부모-자식 추적 기능이므로 상세 화면에서 바로 추가하고 확인한다. -->
+                                            <TextBlock Classes="section-title" Text="Relations" />
+                                            <TextBlock Classes="muted"
+                                                       Text="{Binding RelationCountText}" />
+
+                                            <TextBlock Classes="muted"
+                                                       IsVisible="{Binding HasNoRelations}"
+                                                       Text="No relation has been linked for this issue." />
+
+                                            <ItemsControl ItemsSource="{Binding Relations}"
+                                                          IsVisible="{Binding HasRelations}">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate x:DataType="vm:IssueRelationViewModel">
+                                                        <Border Background="#FFFDF8"
+                                                                BorderBrush="{StaticResource TrackyBorderBrush}"
+                                                                BorderThickness="1"
+                                                                CornerRadius="8"
+                                                                Margin="0,0,0,10"
+                                                                Padding="14">
+                                                            <StackPanel Spacing="6">
+                                                                <WrapPanel>
+                                                                    <Border Background="{StaticResource TrackyAccentSoftBrush}"
+                                                                            CornerRadius="999"
+                                                                            Margin="0,0,8,0"
+                                                                            Padding="8,3">
+                                                                        <TextBlock Text="{Binding RelationTypeText}"
+                                                                                   Foreground="{StaticResource TrackyAccentBrush}"
+                                                                                   FontWeight="SemiBold" />
+                                                                    </Border>
+                                                                    <TextBlock Classes="muted"
+                                                                               Margin="0,4,0,0"
+                                                                               Text="{Binding CreatedText}" />
+                                                                </WrapPanel>
+                                                                <TextBlock Text="{Binding TargetText}"
+                                                                           FontWeight="SemiBold"
+                                                                           Foreground="{StaticResource TrackyInkBrush}"
+                                                                           TextWrapping="Wrap" />
+                                                            </StackPanel>
+                                                        </Border>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+
+                                            <Grid ColumnDefinitions="*,150" ColumnSpacing="10">
+                                                <TextBox Watermark="Target issue number"
+                                                         Text="{Binding #RootWindow.((vm:MainWindowViewModel)DataContext).DraftRelationTargetIssueNumber}" />
+                                                <ComboBox Grid.Column="1"
+                                                          ItemsSource="{Binding #RootWindow.((vm:MainWindowViewModel)DataContext).AvailableIssueRelationTypes}"
+                                                          SelectedItem="{Binding #RootWindow.((vm:MainWindowViewModel)DataContext).DraftRelationType}" />
+                                            </Grid>
+
+                                            <Button Classes="secondary"
+                                                    Command="{Binding #RootWindow.((vm:MainWindowViewModel)DataContext).AddIssueRelationCommand}"
+                                                    Content="Add relation" />
+                                        </StackPanel>
+                                    </Border>
+
+                                    <Border Background="{StaticResource TrackySurfaceStrongBrush}"
+                                            BorderBrush="{StaticResource TrackyBorderBrush}"
+                                            BorderThickness="1"
+                                            CornerRadius="10"
                                             Padding="18">
                                         <StackPanel Spacing="12">
                                             <TextBlock Classes="section-title" Text="Add Comment" />
@@ -1203,7 +1531,7 @@
                                     <Border Background="{StaticResource TrackySurfaceStrongBrush}"
                                             BorderBrush="{StaticResource TrackyBorderBrush}"
                                             BorderThickness="1"
-                                            CornerRadius="22"
+                                            CornerRadius="10"
                                             Padding="18">
                                         <StackPanel Spacing="12">
                                             <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
@@ -1230,7 +1558,7 @@
                                                         <Border Background="#FFFDF8"
                                                                 BorderBrush="{StaticResource TrackyBorderBrush}"
                                                                 BorderThickness="1"
-                                                                CornerRadius="16"
+                                                                CornerRadius="8"
                                                                 Margin="0,0,0,10"
                                                                 Padding="14">
                                                             <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
@@ -1260,7 +1588,66 @@
                                     <Border Background="{StaticResource TrackySurfaceStrongBrush}"
                                             BorderBrush="{StaticResource TrackyBorderBrush}"
                                             BorderThickness="1"
-                                            CornerRadius="22"
+                                            CornerRadius="10"
+                                            Padding="18">
+                                        <StackPanel Spacing="12">
+                                            <TextBlock Classes="section-title" Text="Reminders" />
+                                            <TextBlock Classes="muted"
+                                                       Text="{Binding ReminderCountText}" />
+
+                                            <TextBlock Classes="muted"
+                                                       IsVisible="{Binding HasNoReminders}"
+                                                       Text="No reminder has been scheduled for this issue." />
+
+                                            <ItemsControl ItemsSource="{Binding Reminders}"
+                                                          IsVisible="{Binding HasReminders}">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate x:DataType="vm:IssueReminderViewModel">
+                                                        <Border Background="#FFFDF8"
+                                                                BorderBrush="{StaticResource TrackyBorderBrush}"
+                                                                BorderThickness="1"
+                                                                CornerRadius="8"
+                                                                Margin="0,0,0,10"
+                                                                Padding="14">
+                                                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                                                                <StackPanel Spacing="6">
+                                                                    <WrapPanel>
+                                                                        <Border Background="{Binding StatusBadgeBackground}"
+                                                                                CornerRadius="999"
+                                                                                Margin="0,0,8,0"
+                                                                                Padding="8,3">
+                                                                            <TextBlock Text="{Binding StatusText}"
+                                                                                       Foreground="{Binding StatusBadgeForeground}"
+                                                                                       FontWeight="SemiBold" />
+                                                                        </Border>
+                                                                        <TextBlock Classes="muted"
+                                                                                   Margin="0,4,0,0"
+                                                                                   Text="{Binding RemindAtText}" />
+                                                                    </WrapPanel>
+                                                                    <TextBlock Text="{Binding Title}"
+                                                                               FontWeight="SemiBold"
+                                                                               Foreground="{StaticResource TrackyInkBrush}" />
+                                                                    <TextBlock Classes="muted"
+                                                                               Text="{Binding Note}"
+                                                                               TextWrapping="Wrap" />
+                                                                </StackPanel>
+                                                                <Button Grid.Column="1"
+                                                                        Classes="secondary"
+                                                                        Command="{Binding #RootWindow.((vm:MainWindowViewModel)DataContext).DismissReminderCommand}"
+                                                                        CommandParameter="{Binding}"
+                                                                        Content="Dismiss" />
+                                                            </Grid>
+                                                        </Border>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </StackPanel>
+                                    </Border>
+
+                                    <Border Background="{StaticResource TrackySurfaceStrongBrush}"
+                                            BorderBrush="{StaticResource TrackyBorderBrush}"
+                                            BorderThickness="1"
+                                            CornerRadius="10"
                                             Padding="18">
                                         <StackPanel Spacing="12">
                                             <TextBlock Classes="section-title" Text="Comments" />
@@ -1278,7 +1665,7 @@
                                                         <Border Background="#FFFDF8"
                                                                 BorderBrush="{StaticResource TrackyBorderBrush}"
                                                                 BorderThickness="1"
-                                                                CornerRadius="16"
+                                                                CornerRadius="8"
                                                                 Margin="0,0,0,10"
                                                                 Padding="14">
                                                             <StackPanel Spacing="8">
@@ -1304,7 +1691,7 @@
                                     <Border Background="{StaticResource TrackySurfaceStrongBrush}"
                                             BorderBrush="{StaticResource TrackyBorderBrush}"
                                             BorderThickness="1"
-                                            CornerRadius="22"
+                                            CornerRadius="10"
                                             Padding="18">
                                         <StackPanel Spacing="12">
                                             <TextBlock Classes="section-title" Text="Activity" />
@@ -1322,7 +1709,7 @@
                                                         <Border Background="#FFFDF8"
                                                                 BorderBrush="{StaticResource TrackyBorderBrush}"
                                                                 BorderThickness="1"
-                                                                CornerRadius="16"
+                                                                CornerRadius="8"
                                                                 Margin="0,0,0,10"
                                                                 Padding="14">
                                                             <StackPanel Spacing="6">

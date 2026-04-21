@@ -18,6 +18,10 @@ public sealed class IssueDetailViewModel(IssueDetail detail) : ViewModelBase
 
     public IReadOnlyList<IssueActivityViewModel> Activity { get; } = [.. detail.Activity.Select(static activity => new IssueActivityViewModel(activity))];
 
+    public IReadOnlyList<IssueReminderViewModel> Reminders { get; } = [.. detail.Reminders.Select(static reminder => new IssueReminderViewModel(reminder))];
+
+    public IReadOnlyList<IssueRelationViewModel> Relations { get; } = [.. detail.Relations.Select(static relation => new IssueRelationViewModel(relation))];
+
     public bool HasComments => Comments.Count > 0;
 
     public bool HasNoComments => !HasComments;
@@ -30,6 +34,14 @@ public sealed class IssueDetailViewModel(IssueDetail detail) : ViewModelBase
 
     public bool HasNoActivity => !HasActivity;
 
+    public bool HasReminders => Reminders.Count > 0;
+
+    public bool HasNoReminders => !HasReminders;
+
+    public bool HasRelations => Relations.Count > 0;
+
+    public bool HasNoRelations => !HasRelations;
+
     public string CommentCountText => Comments.Count == 1
         ? "1 comment"
         : $"{Comments.Count} comments";
@@ -37,4 +49,12 @@ public sealed class IssueDetailViewModel(IssueDetail detail) : ViewModelBase
     public string AttachmentCountText => Attachments.Count == 1
         ? "1 attachment"
         : $"{Attachments.Count} attachments";
+
+    public string ReminderCountText => Reminders.Count == 1
+        ? "1 reminder"
+        : $"{Reminders.Count} reminders";
+
+    public string RelationCountText => Relations.Count == 1
+        ? "1 relation"
+        : $"{Relations.Count} relations";
 }

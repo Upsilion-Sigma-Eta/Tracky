@@ -67,6 +67,18 @@ public sealed class IssueCardViewModel(IssueListItem issue) : ViewModelBase
         ? Issue.ProjectName!
         : "Workspace inbox";
 
+    public bool HasMilestone => !string.IsNullOrWhiteSpace(Issue.MilestoneName);
+
+    public string MilestoneText => HasMilestone
+        ? Issue.MilestoneName!
+        : "No milestone";
+
+    public bool HasIssueType => !string.IsNullOrWhiteSpace(Issue.IssueTypeName);
+
+    public string IssueTypeText => HasIssueType
+        ? Issue.IssueTypeName!
+        : "Task";
+
     public IReadOnlyList<string> Labels => Issue.Labels;
 
     public bool HasLabels => Labels.Count > 0;

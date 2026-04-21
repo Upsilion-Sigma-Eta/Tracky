@@ -8,4 +8,6 @@ public sealed record UpdateIssueInput(
     IssuePriority Priority,
     DateOnly? DueDate,
     string? ProjectName,
-    IReadOnlyList<string> Labels);
+    IReadOnlyList<string> Labels,
+    string? MilestoneName = null,
+    string? IssueTypeName = null);
