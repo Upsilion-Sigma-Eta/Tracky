@@ -1,3 +1,4 @@
+using System.Globalization;
 using Tracky.Core.Issues;
 
 namespace Tracky.App.ViewModels;
@@ -19,6 +20,12 @@ public sealed class IssueCardViewModel(IssueListItem issue) : ViewModelBase
     public bool IsClosed => !IsOpen;
 
     public string StateText => IsOpen ? "Open" : "Closed";
+
+    public string StateIconText => IsOpen ? "!" : "x";
+
+    public string StateIconBackground => IsOpen ? "#1F883D" : "#8250DF";
+
+    public string StateIconForeground => IsOpen ? "#FFFFFF" : "#FFFFFF";
 
     public string StateDetailText => IsClosed && Issue.StateReason != IssueStateReason.None
         ? $"Closed as {FormatStateReason(Issue.StateReason)}"
@@ -89,6 +96,8 @@ public sealed class IssueCardViewModel(IssueListItem issue) : ViewModelBase
         ? "1 comment"
         : $"{Issue.CommentCount} comments";
 
+    public string CommentBadgeText => Issue.CommentCount.ToString(CultureInfo.InvariantCulture);
+
     public bool HasAttachments => Issue.AttachmentCount > 0;
 
     public string AttachmentsText => Issue.AttachmentCount == 1
@@ -141,6 +150,12 @@ public sealed class IssueCardViewModel(IssueListItem issue) : ViewModelBase
             : "#047857";
 
     public string UpdatedText => $"Updated {Issue.UpdatedAtUtc.ToLocalTime():MMM dd, HH:mm}";
+
+    public string GitHubListMetaText => IsOpen
+        ? $"{NumberText} updated {Issue.UpdatedAtUtc.ToLocalTime():MMM dd, HH:mm} by {AssigneeText}"
+        : $"{NumberText} closed {Issue.UpdatedAtUtc.ToLocalTime():MMM dd, HH:mm} by {AssigneeText}";
+
+    public string GitHubListSecondaryText => $"{ProjectText} / {MilestoneText} / {IssueTypeText}";
 
     public string ActionLabel => IsOpen
         ? "Close issue"

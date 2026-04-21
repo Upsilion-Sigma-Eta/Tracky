@@ -35,7 +35,9 @@ public sealed class SqliteTrackyWorkspaceServiceTests
                     IssuePriority.High,
                     new DateOnly(2026, 4, 23),
                     "Tracky Foundation",
-                    ["foundation", "desktop"]));
+                    ["foundation", "desktop"],
+                    Description: "<p>Initial HTML body.</p>",
+                    ContentFormat: IssueContentFormat.Html));
 
             var overviewAfterCreate = await service.GetOverviewAsync();
             Assert.Contains(overviewAfterCreate.Issues, issue => issue.Id == createdIssue.Id);
@@ -49,7 +51,8 @@ public sealed class SqliteTrackyWorkspaceServiceTests
                     IssuePriority.Critical,
                     new DateOnly(2026, 4, 24),
                     "Tracky Shell",
-                    ["foundation", "metadata", "desktop"]));
+                    ["foundation", "metadata", "desktop"],
+                    ContentFormat: IssueContentFormat.Html));
 
             Assert.NotNull(metadataUpdate);
             Assert.Equal("Add workspace switching shell and selector metadata", metadataUpdate.Title);
@@ -63,7 +66,8 @@ public sealed class SqliteTrackyWorkspaceServiceTests
                 new AddIssueCommentInput(
                     createdIssue.Id,
                     "Dabin",
-                    "We should keep workspace switching visible from the top navigation."));
+                    "<p>We should keep workspace switching visible from the top navigation.</p>",
+                    IssueContentFormat.Html));
 
             Assert.NotNull(comment);
 
@@ -89,7 +93,9 @@ public sealed class SqliteTrackyWorkspaceServiceTests
             var detail = await service.GetIssueDetailAsync(createdIssue.Id);
             Assert.NotNull(detail);
             Assert.Equal("The selector should keep issue metadata editable from the Phase 1 detail panel.", detail.Description);
+            Assert.Equal(IssueContentFormat.Html, detail.DescriptionFormat);
             Assert.Single(detail.Comments);
+            Assert.Equal(IssueContentFormat.Html, detail.Comments[0].BodyFormat);
             Assert.Single(detail.Attachments);
             Assert.Contains(detail.Activity, item => item.EventType == "issue.updated");
             Assert.Contains(detail.Activity, item => item.EventType == "issue.comment.added");
@@ -695,10 +701,10 @@ public sealed class SqliteTrackyWorkspaceServiceTests
 
             var preferences = await service.UpdateWorkspacePreferencesAsync(
                 new UpdateWorkspacePreferencesInput(
-                    AppThemePreference.Dark,
+                    AppThemePreference.DarkBlue,
                     CompactDensity: false,
                     "Vim"));
-            Assert.Equal(AppThemePreference.Dark, preferences.Theme);
+            Assert.Equal(AppThemePreference.DarkBlue, preferences.Theme);
             Assert.False(preferences.CompactDensity);
             Assert.Equal("Vim", preferences.ShortcutProfile);
 
@@ -710,7 +716,7 @@ public sealed class SqliteTrackyWorkspaceServiceTests
             Assert.Equal(1, validationMilestone.OpenIssues);
             Assert.Contains(overview.IssueTypes, issueType => issueType.Name == "Bug");
             Assert.Contains(overview.SavedIssueSearches, search => search.Name == "Phase 3 validation bugs" && search.IsPinned);
-            Assert.Equal(AppThemePreference.Dark, overview.Preferences.Theme);
+            Assert.Equal(AppThemePreference.DarkBlue, overview.Preferences.Theme);
             Assert.False(overview.Preferences.CompactDensity);
             Assert.Equal("Vim", overview.Preferences.ShortcutProfile);
 

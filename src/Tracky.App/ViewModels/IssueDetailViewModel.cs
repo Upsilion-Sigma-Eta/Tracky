@@ -12,6 +12,26 @@ public sealed class IssueDetailViewModel(IssueDetail detail) : ViewModelBase
         ? "No description has been written for this issue yet."
         : Detail.Description;
 
+    public IReadOnlyList<IssueContentBlockViewModel> DescriptionBlocks { get; } = IssueContentRenderer.Render(
+        detail.Description,
+        detail.DescriptionFormat,
+        "No description has been written for this issue yet.");
+
+    // 실제 화면은 로컬 WebView에서 HTML/CSS를 렌더링하고, 헤드리스 테스트는 아래 fallback 텍스트를 사용한다.
+    // 두 경로가 같은 원문과 포맷 값을 공유해야 Markdown/HTML 저장 계약이 UI에서도 흔들리지 않는다.
+    public string DescriptionHtmlDocument { get; } = IssueHtmlDocumentRenderer.RenderDocument(
+        detail.Description,
+        detail.DescriptionFormat,
+        "No description has been written for this issue yet.");
+
+    public string DescriptionFallbackText => string.Join(
+        Environment.NewLine,
+        DescriptionBlocks.Select(static block => block.DisplayText));
+
+    public double DescriptionPreviewHeight { get; } = IssueHtmlDocumentRenderer.EstimatePreviewHeight(detail.Description);
+
+    public string DescriptionFormatText => FormatContentKind(Detail.DescriptionFormat);
+
     public IReadOnlyList<IssueCommentViewModel> Comments { get; } = [.. detail.Comments.Select(static comment => new IssueCommentViewModel(comment))];
 
     public IReadOnlyList<IssueAttachmentViewModel> Attachments { get; } = [.. detail.Attachments.Select(static attachment => new IssueAttachmentViewModel(attachment))];
@@ -57,4 +77,10 @@ public sealed class IssueDetailViewModel(IssueDetail detail) : ViewModelBase
     public string RelationCountText => Relations.Count == 1
         ? "1 relation"
         : $"{Relations.Count} relations";
+
+    internal static string FormatContentKind(IssueContentFormat format) => format switch
+    {
+        IssueContentFormat.Html => "HTML",
+        _ => "Markdown",
+    };
 }

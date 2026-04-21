@@ -8,18 +8,21 @@
     </Application.DataTemplates>
 
     <Application.Resources>
-        <!-- Phase 1 디자인 시스템의 시작점으로, 앱 셸 전반에서 재사용할 기본 팔레트를 먼저 고정한다. -->
-        <SolidColorBrush x:Key="TrackyCanvasBrush" Color="#F4EFE7" />
-        <SolidColorBrush x:Key="TrackySurfaceBrush" Color="#FFFDF8" />
-        <SolidColorBrush x:Key="TrackySurfaceStrongBrush" Color="#FFF8EF" />
-        <SolidColorBrush x:Key="TrackyBorderBrush" Color="#E7E5E4" />
-        <SolidColorBrush x:Key="TrackyInkBrush" Color="#1F2937" />
-        <SolidColorBrush x:Key="TrackyMutedInkBrush" Color="#6B7280" />
-        <SolidColorBrush x:Key="TrackyAccentBrush" Color="#0F766E" />
-        <SolidColorBrush x:Key="TrackyAccentSoftBrush" Color="#D1FAE5" />
-        <SolidColorBrush x:Key="TrackyNavBrush" Color="#171717" />
-        <SolidColorBrush x:Key="TrackyNavInkBrush" Color="#FAFAF9" />
-        <SolidColorBrush x:Key="TrackyNavMutedInkBrush" Color="#A8A29E" />
+        <!-- GitHub Issues에 가까운 명도, 경계, 액션 색을 앱 전체 토큰으로 고정해 화면 간 톤이 흔들리지 않게 한다. -->
+        <SolidColorBrush x:Key="TrackyCanvasBrush" Color="#F6F8FA" />
+        <SolidColorBrush x:Key="TrackySurfaceBrush" Color="#FFFFFF" />
+        <SolidColorBrush x:Key="TrackySurfaceStrongBrush" Color="#F6F8FA" />
+        <SolidColorBrush x:Key="TrackyBorderBrush" Color="#D0D7DE" />
+        <SolidColorBrush x:Key="TrackyInkBrush" Color="#24292F" />
+        <SolidColorBrush x:Key="TrackyMutedInkBrush" Color="#57606A" />
+        <SolidColorBrush x:Key="TrackyAccentBrush" Color="#1F883D" />
+        <SolidColorBrush x:Key="TrackyAccentSoftBrush" Color="#DAFBE1" />
+        <SolidColorBrush x:Key="TrackyNavBrush" Color="#24292F" />
+        <SolidColorBrush x:Key="TrackyNavHoverBrush" Color="#3B434D" />
+        <SolidColorBrush x:Key="TrackyNavActiveBrush" Color="#0969DA" />
+        <SolidColorBrush x:Key="TrackyNavBorderBrush" Color="#57606A" />
+        <SolidColorBrush x:Key="TrackyNavInkBrush" Color="#F6F8FA" />
+        <SolidColorBrush x:Key="TrackyNavMutedInkBrush" Color="#8C959F" />
     </Application.Resources>
 
     <Application.Styles>

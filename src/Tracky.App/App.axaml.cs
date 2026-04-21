@@ -1,7 +1,6 @@
 using System.ComponentModel;
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
-using Avalonia.Data.Core.Plugins;
 using Avalonia.Markup.Xaml;
 using Avalonia.Media;
 using Avalonia.Styling;
@@ -26,7 +25,8 @@ public partial class App : Application
     {
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
-            DisableAvaloniaDataAnnotationValidation();
+            // Avalonia 12에서는 BindingPlugins API가 제거되었고 DataAnnotations 검증도 기본 활성 경로가 아니다.
+            // 따라서 Avalonia 11에서 쓰던 명시적 플러그인 제거 코드는 유지하지 않는다.
 
             var mainWindow = new MainWindow();
             var mainViewModel = new MainWindowViewModel(
@@ -47,17 +47,6 @@ public partial class App : Application
         base.OnFrameworkInitializationCompleted();
     }
 
-    private static void DisableAvaloniaDataAnnotationValidation()
-    {
-        var dataValidationPluginsToRemove =
-            BindingPlugins.DataValidators.OfType<DataAnnotationsValidationPlugin>().ToArray();
-
-        foreach (var plugin in dataValidationPluginsToRemove)
-        {
-            BindingPlugins.DataValidators.Remove(plugin);
-        }
-    }
-
     private static void ApplyAppearancePreferencesWhenNeeded(
         MainWindowViewModel viewModel,
         PropertyChangedEventArgs args)
@@ -76,29 +65,95 @@ public partial class App : Application
             return;
         }
 
-        // Phase3 환경설정은 DB 저장만이 아니라 실제 앱 테마와 팔레트까지 반영되어야
-        // Preferences / Appearance 모듈의 사용자 체감 계약을 만족한다.
-        Current.RequestedThemeVariant = viewModel.SelectedThemePreference switch
-        {
-            AppThemePreference.Dark => ThemeVariant.Dark,
-            AppThemePreference.Light => ThemeVariant.Light,
-            _ => ThemeVariant.Default,
-        };
+        // 테마는 단순 Light/Dark가 아니라 명시적인 4개 팔레트 계약이다.
+        // 저장된 선호값을 즉시 리소스 브러시에 반영해 열린 창 전체가 같은 색상 체계를 공유하게 한다.
+        var palette = GetThemePalette(viewModel.SelectedThemePreference);
+        Current.RequestedThemeVariant = palette.IsDark ? ThemeVariant.Dark : ThemeVariant.Light;
 
-        var useDarkPalette = viewModel.SelectedThemePreference == AppThemePreference.Dark;
-        SetBrushColor("TrackyCanvasBrush", useDarkPalette ? "#111827" : "#F4EFE7");
-        SetBrushColor("TrackySurfaceBrush", useDarkPalette ? "#171717" : "#FFFDF8");
-        SetBrushColor("TrackySurfaceStrongBrush", useDarkPalette ? "#1F2937" : "#FFF8EF");
-        SetBrushColor("TrackyBorderBrush", useDarkPalette ? "#374151" : "#E7E5E4");
-        SetBrushColor("TrackyInkBrush", useDarkPalette ? "#F9FAFB" : "#1F2937");
-        SetBrushColor("TrackyMutedInkBrush", useDarkPalette ? "#D1D5DB" : "#6B7280");
-        SetBrushColor("TrackyAccentBrush", useDarkPalette ? "#2DD4BF" : "#0F766E");
-        SetBrushColor("TrackyAccentSoftBrush", useDarkPalette ? "#134E4A" : "#D1FAE5");
-        SetBrushColor("TrackyNavBrush", useDarkPalette ? "#030712" : "#171717");
-        SetBrushColor("TrackyNavInkBrush", "#FAFAF9");
-        SetBrushColor("TrackyNavMutedInkBrush", useDarkPalette ? "#9CA3AF" : "#A8A29E");
+        SetBrushColor("TrackyCanvasBrush", palette.Canvas);
+        SetBrushColor("TrackySurfaceBrush", palette.Surface);
+        SetBrushColor("TrackySurfaceStrongBrush", palette.SurfaceStrong);
+        SetBrushColor("TrackyBorderBrush", palette.Border);
+        SetBrushColor("TrackyInkBrush", palette.Ink);
+        SetBrushColor("TrackyMutedInkBrush", palette.MutedInk);
+        SetBrushColor("TrackyAccentBrush", palette.Accent);
+        SetBrushColor("TrackyAccentSoftBrush", palette.AccentSoft);
+        SetBrushColor("TrackyNavBrush", palette.Nav);
+        SetBrushColor("TrackyNavHoverBrush", palette.NavHover);
+        SetBrushColor("TrackyNavActiveBrush", palette.NavActive);
+        SetBrushColor("TrackyNavBorderBrush", palette.NavBorder);
+        SetBrushColor("TrackyNavInkBrush", palette.NavInk);
+        SetBrushColor("TrackyNavMutedInkBrush", palette.NavMutedInk);
         ApplyDensityPreference(viewModel.CompactDensityPreference);
     }
+
+    private static ThemePalette GetThemePalette(AppThemePreference preference) => preference switch
+    {
+        AppThemePreference.BlueOrange => new ThemePalette(
+            IsDark: false,
+            Canvas: "#EFF6FF",
+            Surface: "#FFFFFF",
+            SurfaceStrong: "#DBEAFE",
+            Border: "#93C5FD",
+            Ink: "#172033",
+            MutedInk: "#475569",
+            Accent: "#EA580C",
+            AccentSoft: "#FFEDD5",
+            Nav: "#1D4ED8",
+            NavHover: "#2563EB",
+            NavActive: "#F97316",
+            NavBorder: "#60A5FA",
+            NavInk: "#FFFFFF",
+            NavMutedInk: "#DBEAFE"),
+        AppThemePreference.DarkBlue => new ThemePalette(
+            IsDark: true,
+            Canvas: "#0F172A",
+            Surface: "#111827",
+            SurfaceStrong: "#1E293B",
+            Border: "#334155",
+            Ink: "#F8FAFC",
+            MutedInk: "#CBD5E1",
+            Accent: "#38BDF8",
+            AccentSoft: "#082F49",
+            Nav: "#020617",
+            NavHover: "#1E293B",
+            NavActive: "#2563EB",
+            NavBorder: "#334155",
+            NavInk: "#F8FAFC",
+            NavMutedInk: "#94A3B8"),
+        AppThemePreference.DarkOrange => new ThemePalette(
+            IsDark: true,
+            Canvas: "#18110B",
+            Surface: "#1C1917",
+            SurfaceStrong: "#292524",
+            Border: "#57534E",
+            Ink: "#FAFAF9",
+            MutedInk: "#D6D3D1",
+            Accent: "#FB923C",
+            AccentSoft: "#431407",
+            Nav: "#0C0A09",
+            NavHover: "#292524",
+            NavActive: "#EA580C",
+            NavBorder: "#57534E",
+            NavInk: "#FAFAF9",
+            NavMutedInk: "#A8A29E"),
+        _ => new ThemePalette(
+            IsDark: false,
+            Canvas: "#F6F8FA",
+            Surface: "#FFFFFF",
+            SurfaceStrong: "#F6F8FA",
+            Border: "#D0D7DE",
+            Ink: "#24292F",
+            MutedInk: "#57606A",
+            Accent: "#0969DA",
+            AccentSoft: "#DDF4FF",
+            Nav: "#24292F",
+            NavHover: "#3B434D",
+            NavActive: "#0969DA",
+            NavBorder: "#57606A",
+            NavInk: "#F6F8FA",
+            NavMutedInk: "#C9D1D9"),
+    };
 
     private static void SetBrushColor(string resourceKey, string colorHex)
     {
@@ -140,4 +195,21 @@ public partial class App : Application
             return;
         }
     }
+
+    private sealed record ThemePalette(
+        bool IsDark,
+        string Canvas,
+        string Surface,
+        string SurfaceStrong,
+        string Border,
+        string Ink,
+        string MutedInk,
+        string Accent,
+        string AccentSoft,
+        string Nav,
+        string NavHover,
+        string NavActive,
+        string NavBorder,
+        string NavInk,
+        string NavMutedInk);
 }

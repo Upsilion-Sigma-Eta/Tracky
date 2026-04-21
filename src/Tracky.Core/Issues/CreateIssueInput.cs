@@ -8,4 +8,6 @@ public sealed record CreateIssueInput(
     string? ProjectName,
     IReadOnlyList<string> Labels,
     string? MilestoneName = null,
-    string? IssueTypeName = null);
+    string? IssueTypeName = null,
+    string? Description = null,
+    IssueContentFormat ContentFormat = IssueContentFormat.Markdown);

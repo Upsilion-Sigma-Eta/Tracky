@@ -7,5 +7,5 @@ public sealed record WorkspacePreferences(
     DateTimeOffset UpdatedAtUtc)
 {
     public static WorkspacePreferences Default { get; } =
-        new(AppThemePreference.Light, CompactDensity: true, "Default", DateTimeOffset.UnixEpoch);
+        new(AppThemePreference.WhiteBlue, CompactDensity: true, "Default", DateTimeOffset.UnixEpoch);
 }

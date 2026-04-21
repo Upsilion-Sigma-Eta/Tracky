@@ -19,6 +19,7 @@ public sealed class TestTrackyWorkspaceService : ITrackyWorkspaceService
     private readonly Dictionary<Guid, Dictionary<string, string>> _customFieldValuesByProjectItemId = [];
     private readonly Dictionary<Guid, List<IssueComment>> _commentsByIssueId = [];
     private readonly Dictionary<Guid, string> _descriptionByIssueId = [];
+    private readonly Dictionary<Guid, IssueContentFormat> _descriptionFormatByIssueId = [];
     private readonly Dictionary<Guid, List<IssueRelation>> _relationsByIssueId = [];
     private readonly Dictionary<Guid, IssueReminder> _remindersById = [];
     private readonly Dictionary<Guid, string> _projectDescriptionById = [];
@@ -81,6 +82,8 @@ public sealed class TestTrackyWorkspaceService : ITrackyWorkspaceService
 
         service._descriptionByIssueId[openIssueId] = "Open issue description for the right-side detail panel.";
         service._descriptionByIssueId[closedIssueId] = "Closed issue description for filter verification.";
+        service._descriptionFormatByIssueId[openIssueId] = IssueContentFormat.Markdown;
+        service._descriptionFormatByIssueId[closedIssueId] = IssueContentFormat.Markdown;
 
         service._commentsByIssueId[openIssueId] =
         [
@@ -89,6 +92,7 @@ public sealed class TestTrackyWorkspaceService : ITrackyWorkspaceService
                 openIssueId,
                 "Dabin",
                 "Initial comment visible in the GUI detail panel.",
+                IssueContentFormat.Markdown,
                 now.AddMinutes(-8)),
         ];
         service._commentsByIssueId[closedIssueId] = [];
@@ -178,6 +182,7 @@ public sealed class TestTrackyWorkspaceService : ITrackyWorkspaceService
             new IssueDetail(
                 issue,
                 _descriptionByIssueId.GetValueOrDefault(issueId, string.Empty),
+                _descriptionFormatByIssueId.GetValueOrDefault(issueId, IssueContentFormat.Markdown),
                 GetComments(issueId),
                 GetAttachments(issueId),
                 GetActivity(issueId),
@@ -211,7 +216,8 @@ public sealed class TestTrackyWorkspaceService : ITrackyWorkspaceService
             EnsureProject(issue.ProjectName, $"Issues grouped under {issue.ProjectName}.");
         }
 
-        _descriptionByIssueId[issue.Id] = "Created by the quick capture flow.";
+        _descriptionByIssueId[issue.Id] = input.Description?.Trim() ?? "Created by the quick capture flow.";
+        _descriptionFormatByIssueId[issue.Id] = input.ContentFormat;
         _commentsByIssueId[issue.Id] = [];
         _attachmentsByIssueId[issue.Id] = [];
         _relationsByIssueId[issue.Id] = [];
@@ -267,6 +273,7 @@ public sealed class TestTrackyWorkspaceService : ITrackyWorkspaceService
         }
 
         _descriptionByIssueId[input.IssueId] = input.Description.Trim();
+        _descriptionFormatByIssueId[input.IssueId] = input.ContentFormat;
         AddActivity(input.IssueId, "issue.updated", "Issue title, body, and metadata were updated.");
         return Task.FromResult<IssueListItem?>(updatedIssue);
     }
@@ -354,6 +361,7 @@ public sealed class TestTrackyWorkspaceService : ITrackyWorkspaceService
             input.IssueId,
             input.AuthorDisplayName.Trim(),
             input.Body.Trim(),
+            input.BodyFormat,
             DateTimeOffset.UtcNow);
         _commentsByIssueId[input.IssueId].Add(comment);
         _issues[issueIndex] = _issues[issueIndex] with

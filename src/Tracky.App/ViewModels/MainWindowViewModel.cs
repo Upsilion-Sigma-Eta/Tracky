@@ -15,6 +15,16 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
 {
     private const string DefaultProjectSortField = "Board position";
     private const string NoProjectGroupingField = "None";
+    private const string DefaultIssueSortOption = "Newest updated";
+    private const string AnyIssueAssigneeFilter = "Assignee";
+    private const string AnyIssueLabelFilter = "Labels";
+    private const string AnyIssueProjectFilter = "Projects";
+    private const string AnyIssueMilestoneFilter = "Milestones";
+    private const string AnyIssueTypeFilter = "Types";
+    private const string UnassignedIssueFilter = "Unassigned";
+    private const string NoProjectIssueFilter = "No project";
+    private const string NoMilestoneIssueFilter = "No milestone";
+    private const string EmptyCommentPreviewText = "Nothing to preview yet.";
 
     private static readonly string[] BaseProjectSortFields =
     [
@@ -35,6 +45,16 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         "State",
         "Priority",
         "Assignee",
+        "Due date",
+    ];
+
+    private static readonly string[] IssueSortOptions =
+    [
+        DefaultIssueSortOption,
+        "Oldest updated",
+        "Most commented",
+        "Least commented",
+        "Highest priority",
         "Due date",
     ];
 
@@ -64,6 +84,12 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         ShowAllCommand = new RelayCommand(ShowAll);
         ShowOpenCommand = new RelayCommand(ShowOpen);
         ShowClosedCommand = new RelayCommand(ShowClosed);
+        PrepareNewIssueCommand = new RelayCommand(PrepareNewIssue);
+        BackToIssueListCommand = new RelayCommand(BackToIssueList);
+        StartDescriptionEditCommand = new RelayCommand(StartDescriptionEdit);
+        CancelDescriptionEditCommand = new RelayCommand(CancelDescriptionEdit);
+        ShowCommentWriteCommand = new RelayCommand(ShowCommentWrite);
+        ShowCommentPreviewCommand = new RelayCommand(ShowCommentPreview);
         ShowProjectBoardCommand = new RelayCommand(() => SetProjectViewMode(ProjectViewMode.Board));
         ShowProjectTableCommand = new RelayCommand(() => SetProjectViewMode(ProjectViewMode.Table));
         ShowProjectCalendarCommand = new RelayCommand(() => SetProjectViewMode(ProjectViewMode.Calendar));
@@ -125,10 +151,14 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         DraftExportIncludeClosedIssues = false;
         DraftRelationType = IssueRelationType.Related;
         DraftSavedIssueSearchPinned = true;
-        SelectedThemePreference = AppThemePreference.Light;
+        DraftIssueContentFormat = IssueContentFormat.Markdown;
+        DraftCommentFormat = IssueContentFormat.Markdown;
+        EditDescriptionFormat = IssueContentFormat.Markdown;
+        SelectedThemePreference = AppThemePreference.WhiteBlue;
         CompactDensityPreference = true;
         ShortcutProfilePreference = "Default";
 
+        RefreshIssueFilterOptions();
         RefreshProjectArrangementOptions([]);
     }
 
@@ -141,6 +171,18 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     public RelayCommand ShowOpenCommand { get; }
 
     public RelayCommand ShowClosedCommand { get; }
+
+    public RelayCommand PrepareNewIssueCommand { get; }
+
+    public RelayCommand BackToIssueListCommand { get; }
+
+    public RelayCommand StartDescriptionEditCommand { get; }
+
+    public RelayCommand CancelDescriptionEditCommand { get; }
+
+    public RelayCommand ShowCommentWriteCommand { get; }
+
+    public RelayCommand ShowCommentPreviewCommand { get; }
 
     public RelayCommand ShowProjectBoardCommand { get; }
 
@@ -245,7 +287,21 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
 
     public ObservableCollection<SavedIssueSearchViewModel> SavedIssueSearches { get; } = [];
 
+    public ObservableCollection<string> AvailableIssueAssigneeFilters { get; } = [];
+
+    public ObservableCollection<string> AvailableIssueLabelFilters { get; } = [];
+
+    public ObservableCollection<string> AvailableIssueProjectFilters { get; } = [];
+
+    public ObservableCollection<string> AvailableIssueMilestoneFilters { get; } = [];
+
+    public ObservableCollection<string> AvailableIssueTypeFilters { get; } = [];
+
+    public IReadOnlyList<string> AvailableIssueSortOptions { get; } = IssueSortOptions;
+
     public IReadOnlyList<IssuePriority> AvailablePriorities { get; } = Enum.GetValues<IssuePriority>();
+
+    public IReadOnlyList<IssueContentFormat> AvailableIssueContentFormats { get; } = Enum.GetValues<IssueContentFormat>();
 
     public IReadOnlyList<IssueRelationType> AvailableIssueRelationTypes { get; } = Enum.GetValues<IssueRelationType>();
 
@@ -281,13 +337,38 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
 
     public bool IsIssuesViewActive => !IsProjectsViewActive;
 
-    public bool IsQuickCaptureVisible => IsIssuesViewActive;
+    public bool IsIssueListViewVisible => IsIssuesViewActive && !IsIssueDetailViewActive;
 
-    public bool IsIssueEditorVisible => IsIssuesViewActive && HasSelectedIssueDetail;
+    public bool IsIssueDetailViewActive => IsIssuesViewActive && _isIssueDetailPageActive && HasSelectedIssue;
 
-    public bool IsIssueDetailPlaceholderVisible => IsIssuesViewActive && HasNoSelectedIssue;
+    public bool IsQuickCaptureVisible => IsIssueListViewVisible;
 
-    public bool IsSelectedIssueDetailVisible => IsIssuesViewActive && HasSelectedIssueDetail;
+    public bool IsIssueEditorVisible => IsIssueDetailViewActive && HasSelectedIssueDetail;
+
+    public bool IsDescriptionEditMode => _isDescriptionEditMode;
+
+    public bool IsDescriptionReadMode => !IsDescriptionEditMode;
+
+    public bool IsCommentPreviewMode => _isCommentPreviewMode;
+
+    public bool IsCommentWriteMode => !IsCommentPreviewMode;
+
+    public string DraftCommentPreviewHtmlDocument => IssueHtmlDocumentRenderer.RenderDocument(
+        DraftCommentBody,
+        DraftCommentFormat,
+        EmptyCommentPreviewText);
+
+    public string DraftCommentPreviewFallbackText => string.Join(
+        Environment.NewLine,
+        IssueContentRenderer
+            .Render(DraftCommentBody, DraftCommentFormat, EmptyCommentPreviewText)
+            .Select(static block => block.DisplayText));
+
+    public double DraftCommentPreviewHeight => IssueHtmlDocumentRenderer.EstimatePreviewHeight(DraftCommentBody);
+
+    public bool IsIssueDetailPlaceholderVisible => IsIssueListViewVisible && HasNoSelectedIssue;
+
+    public bool IsSelectedIssueDetailVisible => IsIssueDetailViewActive && HasSelectedIssueDetail;
 
     public bool IsProjectBoardViewActive => SelectedProjectViewMode == ProjectViewMode.Board;
 
@@ -339,7 +420,27 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
 
     private string _searchText = string.Empty;
 
+    private string _selectedIssueAssigneeFilter = AnyIssueAssigneeFilter;
+
+    private string _selectedIssueLabelFilter = AnyIssueLabelFilter;
+
+    private string _selectedIssueProjectFilter = AnyIssueProjectFilter;
+
+    private string _selectedIssueMilestoneFilter = AnyIssueMilestoneFilter;
+
+    private string _selectedIssueTypeFilter = AnyIssueTypeFilter;
+
+    private string _selectedIssueSortOption = DefaultIssueSortOption;
+
+    private string _issueListSummaryText = "0 issues";
+
     private bool _isProjectsViewActive;
+
+    private bool _isIssueDetailPageActive;
+
+    private bool _isDescriptionEditMode;
+
+    private bool _isCommentPreviewMode;
 
     private IssueFilterScope _activeScope = IssueFilterScope.All;
 
@@ -391,6 +492,10 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
 
     private string _draftTitle = string.Empty;
 
+    private string _draftDescription = string.Empty;
+
+    private IssueContentFormat _draftIssueContentFormat;
+
     private string _draftAssignee = "Dabin";
 
     private IssuePriority _draftPriority;
@@ -409,9 +514,13 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
 
     private string _draftCommentBody = string.Empty;
 
+    private IssueContentFormat _draftCommentFormat;
+
     private string _editTitle = string.Empty;
 
     private string _editDescription = string.Empty;
+
+    private IssueContentFormat _editDescriptionFormat;
 
     private string _editAssignee = string.Empty;
 
@@ -518,6 +627,84 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         }
     }
 
+    public string SelectedIssueAssigneeFilter
+    {
+        get => _selectedIssueAssigneeFilter;
+        set
+        {
+            if (SetProperty(ref _selectedIssueAssigneeFilter, value))
+            {
+                ApplyFilters();
+            }
+        }
+    }
+
+    public string SelectedIssueLabelFilter
+    {
+        get => _selectedIssueLabelFilter;
+        set
+        {
+            if (SetProperty(ref _selectedIssueLabelFilter, value))
+            {
+                ApplyFilters();
+            }
+        }
+    }
+
+    public string SelectedIssueProjectFilter
+    {
+        get => _selectedIssueProjectFilter;
+        set
+        {
+            if (SetProperty(ref _selectedIssueProjectFilter, value))
+            {
+                ApplyFilters();
+            }
+        }
+    }
+
+    public string SelectedIssueMilestoneFilter
+    {
+        get => _selectedIssueMilestoneFilter;
+        set
+        {
+            if (SetProperty(ref _selectedIssueMilestoneFilter, value))
+            {
+                ApplyFilters();
+            }
+        }
+    }
+
+    public string SelectedIssueTypeFilter
+    {
+        get => _selectedIssueTypeFilter;
+        set
+        {
+            if (SetProperty(ref _selectedIssueTypeFilter, value))
+            {
+                ApplyFilters();
+            }
+        }
+    }
+
+    public string SelectedIssueSortOption
+    {
+        get => _selectedIssueSortOption;
+        set
+        {
+            if (SetProperty(ref _selectedIssueSortOption, value))
+            {
+                ApplyFilters();
+            }
+        }
+    }
+
+    public string IssueListSummaryText
+    {
+        get => _issueListSummaryText;
+        private set => SetProperty(ref _issueListSummaryText, value);
+    }
+
     public bool IsProjectsViewActive
     {
         get => _isProjectsViewActive;
@@ -528,11 +715,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
                 return;
             }
 
-            OnPropertyChanged(nameof(IsIssuesViewActive));
-            OnPropertyChanged(nameof(IsQuickCaptureVisible));
-            OnPropertyChanged(nameof(IsIssueEditorVisible));
-            OnPropertyChanged(nameof(IsIssueDetailPlaceholderVisible));
-            OnPropertyChanged(nameof(IsSelectedIssueDetailVisible));
+            OnIssueNavigationPropertiesChanged();
         }
     }
 
@@ -582,8 +765,8 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
 
             OnPropertyChanged(nameof(HasSelectedIssue));
             OnPropertyChanged(nameof(HasNoSelectedIssue));
-            OnPropertyChanged(nameof(IsIssueDetailPlaceholderVisible));
             OnPropertyChanged(nameof(CanChooseCloseReason));
+            SetIssueDetailPageActive(value is not null && IsIssuesViewActive);
             ToggleSelectedIssueStateCommand.NotifyCanExecuteChanged();
             UpdateSelectedIssueCommand.NotifyCanExecuteChanged();
             DeleteSelectedIssueCommand.NotifyCanExecuteChanged();
@@ -607,9 +790,9 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
             }
 
             OnPropertyChanged(nameof(HasSelectedIssueDetail));
-            OnPropertyChanged(nameof(IsIssueEditorVisible));
-            OnPropertyChanged(nameof(IsSelectedIssueDetailVisible));
+            OnIssueNavigationPropertiesChanged();
             HydrateEditDraft(value);
+            SetDescriptionEditMode(false);
             UpdateSelectedIssueCommand.NotifyCanExecuteChanged();
             OpenAttachmentCommand.NotifyCanExecuteChanged();
             DismissReminderCommand.NotifyCanExecuteChanged();
@@ -815,6 +998,18 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         set => SetProperty(ref _draftAssignee, value);
     }
 
+    public string DraftDescription
+    {
+        get => _draftDescription;
+        set => SetProperty(ref _draftDescription, value);
+    }
+
+    public IssueContentFormat DraftIssueContentFormat
+    {
+        get => _draftIssueContentFormat;
+        set => SetProperty(ref _draftIssueContentFormat, value);
+    }
+
     public IssuePriority DraftPriority
     {
         get => _draftPriority;
@@ -871,6 +1066,19 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
             if (SetProperty(ref _draftCommentBody, value))
             {
                 AddCommentCommand.NotifyCanExecuteChanged();
+                OnDraftCommentPreviewChanged();
+            }
+        }
+    }
+
+    public IssueContentFormat DraftCommentFormat
+    {
+        get => _draftCommentFormat;
+        set
+        {
+            if (SetProperty(ref _draftCommentFormat, value))
+            {
+                OnDraftCommentPreviewChanged();
             }
         }
     }
@@ -891,6 +1099,12 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     {
         get => _editDescription;
         set => SetProperty(ref _editDescription, value);
+    }
+
+    public IssueContentFormat EditDescriptionFormat
+    {
+        get => _editDescriptionFormat;
+        set => SetProperty(ref _editDescriptionFormat, value);
     }
 
     public string EditAssignee
@@ -1206,7 +1420,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
 
     private void ShowIssues()
     {
-        IsProjectsViewActive = false;
+        BackToIssueList();
     }
 
     private void ShowProjects()
@@ -1235,6 +1449,58 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         ActiveScope = IssueFilterScope.Closed;
     }
 
+    private void PrepareNewIssue()
+    {
+        IsProjectsViewActive = false;
+        SelectedIssue = null;
+        SetIssueDetailPageActive(false);
+        SetDescriptionEditMode(false);
+        ShowCommentWrite();
+        DraftTitle = string.Empty;
+        DraftDescription = string.Empty;
+        DraftIssueContentFormat = IssueContentFormat.Markdown;
+        DetailStatusMessage = "New issue panel is ready. Fill the title and metadata, then create it in the local workspace.";
+    }
+
+    private void BackToIssueList()
+    {
+        IsProjectsViewActive = false;
+        SelectedIssue = null;
+        SetIssueDetailPageActive(false);
+        SetDescriptionEditMode(false);
+        ShowCommentWrite();
+    }
+
+    private void StartDescriptionEdit()
+    {
+        if (SelectedIssueDetail is null)
+        {
+            return;
+        }
+
+        // GitHub issue body처럼 읽기 카드의 액션에서 원문 편집으로 들어가도록,
+        // 현재 상세 데이터를 편집 초안에 다시 채운 뒤 body card만 edit 상태로 전환한다.
+        HydrateEditDraft(SelectedIssueDetail);
+        SetDescriptionEditMode(true);
+    }
+
+    private void CancelDescriptionEdit()
+    {
+        // 취소 시에는 사용자가 타이핑한 원문 변경을 버리고 선택 이슈의 저장된 원문으로 되돌린다.
+        HydrateEditDraft(SelectedIssueDetail);
+        SetDescriptionEditMode(false);
+    }
+
+    private void ShowCommentWrite()
+    {
+        SetCommentPreviewMode(false);
+    }
+
+    private void ShowCommentPreview()
+    {
+        SetCommentPreviewMode(true);
+    }
+
     private async Task RefreshAsync(CancellationToken cancellationToken)
     {
         await LoadAsync(SelectedIssue?.Id, cancellationToken: cancellationToken);
@@ -1251,13 +1517,17 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
                 DraftProjectName,
                 ParseLabels(DraftLabels),
                 DraftMilestoneName,
-                DraftIssueTypeName),
+                DraftIssueTypeName,
+                DraftDescription,
+                DraftIssueContentFormat),
             cancellationToken);
 
         DraftTitle = string.Empty;
+        DraftDescription = string.Empty;
         DraftLabels = "foundation";
         DraftMilestoneName = "MVP Readiness";
         DraftIssueTypeName = "Task";
+        DraftIssueContentFormat = IssueContentFormat.Markdown;
         DraftPriority = IssuePriority.High;
         DraftDueDate = DateTimeOffset.Now.AddDays(2);
 
@@ -1335,7 +1605,8 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
                 EditProjectName,
                 ParseLabels(EditLabels),
                 EditMilestoneName,
-                EditIssueTypeName),
+                EditIssueTypeName,
+                EditDescriptionFormat),
             cancellationToken);
 
         await LoadAsync(
@@ -1375,7 +1646,8 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
             new AddIssueCommentInput(
                 issueId,
                 DraftCommentAuthor,
-                DraftCommentBody),
+                DraftCommentBody,
+                DraftCommentFormat),
             cancellationToken);
 
         if (comment is null)
@@ -1385,6 +1657,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         }
 
         DraftCommentBody = string.Empty;
+        ShowCommentWrite();
         await LoadAsync(
             issueId,
             "The selected issue was refreshed after saving the new comment.",
@@ -1671,8 +1944,8 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
             return Task.CompletedTask;
         }
 
+        BackToIssueList();
         SearchText = savedSearch.SavedSearch.QueryText;
-        IsProjectsViewActive = false;
         StatusMessage = $"Saved search \"{savedSearch.SavedSearch.Name}\" applied.";
         return Task.CompletedTask;
     }
@@ -1962,6 +2235,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
             _allIssues.AddRange(overview.Issues.Select(static issue => new IssueCardViewModel(issue)));
             _allProjects.Clear();
             _allProjects.AddRange(projectSummaries.Select(static project => new ProjectSummaryViewModel(project)));
+            RefreshIssueFilterOptions();
             RefreshWorkspaceReminders(overview.Reminders);
             RefreshExportPresets(overview.ExportPresets);
             RefreshSavedIssueSearches(overview.SavedIssueSearches);
@@ -2152,9 +2426,12 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     private void ApplyFilters(Guid? preferredIssueId = null)
     {
         var searchQuery = IssueSearchParser.Parse(SearchText);
-        var filteredIssues = _allIssues
-            .Where(issue => MatchesScope(issue, ActiveScope))
-            .Where(issue => MatchesSearch(issue, searchQuery))
+        var filteredIssues = SortIssues(
+            _allIssues
+                .Where(issue => MatchesScope(issue, ActiveScope))
+                .Where(MatchesIssueDropdownFilters)
+                .Where(issue => MatchesSearch(issue, searchQuery)),
+            SelectedIssueSortOption)
             .ToList();
 
         VisibleIssues.Clear();
@@ -2164,6 +2441,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         }
 
         SelectedIssue = SelectPreferredIssue(filteredIssues, preferredIssueId);
+        IssueListSummaryText = BuildIssueListSummary(filteredIssues.Count);
         ExportSelectionCommand.NotifyCanExecuteChanged();
     }
 
@@ -2178,6 +2456,77 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         OnPropertyChanged(nameof(HasProjects));
         OnPropertyChanged(nameof(HasNoProjects));
         SelectedProject = SelectPreferredProject([.. Projects], preferredProjectId);
+    }
+
+    private void RefreshIssueFilterOptions()
+    {
+        // GitHub Issues의 헤더 드롭다운처럼, 현재 로컬 이슈에 존재하는 메타데이터만 필터 후보로 보여준다.
+        RefreshOptionCollection(
+            AvailableIssueAssigneeFilters,
+            AnyIssueAssigneeFilter,
+            _allIssues.Where(static issue => issue.HasAssignee).Select(static issue => issue.AssigneeText),
+            UnassignedIssueFilter);
+        RefreshOptionCollection(
+            AvailableIssueLabelFilters,
+            AnyIssueLabelFilter,
+            _allIssues.SelectMany(static issue => issue.Labels));
+        RefreshOptionCollection(
+            AvailableIssueProjectFilters,
+            AnyIssueProjectFilter,
+            _allIssues.Where(static issue => issue.HasProject).Select(static issue => issue.ProjectText),
+            NoProjectIssueFilter);
+        RefreshOptionCollection(
+            AvailableIssueMilestoneFilters,
+            AnyIssueMilestoneFilter,
+            _allIssues.Where(static issue => issue.HasMilestone).Select(static issue => issue.MilestoneText),
+            NoMilestoneIssueFilter);
+        RefreshOptionCollection(
+            AvailableIssueTypeFilters,
+            AnyIssueTypeFilter,
+            _allIssues.Where(static issue => issue.HasIssueType).Select(static issue => issue.IssueTypeText));
+
+        EnsureIssueFilterSelection(ref _selectedIssueAssigneeFilter, AnyIssueAssigneeFilter, AvailableIssueAssigneeFilters, nameof(SelectedIssueAssigneeFilter));
+        EnsureIssueFilterSelection(ref _selectedIssueLabelFilter, AnyIssueLabelFilter, AvailableIssueLabelFilters, nameof(SelectedIssueLabelFilter));
+        EnsureIssueFilterSelection(ref _selectedIssueProjectFilter, AnyIssueProjectFilter, AvailableIssueProjectFilters, nameof(SelectedIssueProjectFilter));
+        EnsureIssueFilterSelection(ref _selectedIssueMilestoneFilter, AnyIssueMilestoneFilter, AvailableIssueMilestoneFilters, nameof(SelectedIssueMilestoneFilter));
+        EnsureIssueFilterSelection(ref _selectedIssueTypeFilter, AnyIssueTypeFilter, AvailableIssueTypeFilters, nameof(SelectedIssueTypeFilter));
+    }
+
+    private void EnsureIssueFilterSelection(
+        ref string selectedFilter,
+        string defaultFilter,
+        ObservableCollection<string> availableFilters,
+        string propertyName)
+    {
+        if (availableFilters.Contains(selectedFilter))
+        {
+            return;
+        }
+
+        selectedFilter = defaultFilter;
+        OnPropertyChanged(propertyName);
+    }
+
+    private static void RefreshOptionCollection(
+        ObservableCollection<string> target,
+        string defaultOption,
+        IEnumerable<string> values,
+        string? emptyOption = null)
+    {
+        target.Clear();
+        target.Add(defaultOption);
+        if (!string.IsNullOrWhiteSpace(emptyOption))
+        {
+            target.Add(emptyOption);
+        }
+
+        foreach (var value in values
+                     .Where(static value => !string.IsNullOrWhiteSpace(value))
+                     .Distinct(StringComparer.OrdinalIgnoreCase)
+                     .Order(StringComparer.OrdinalIgnoreCase))
+        {
+            target.Add(value);
+        }
     }
 
     private void RefreshWorkspaceReminders(IReadOnlyList<IssueReminder> reminders)
@@ -2221,6 +2570,63 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         SelectedThemePreference = preferences.Theme;
         CompactDensityPreference = preferences.CompactDensity;
         ShortcutProfilePreference = preferences.ShortcutProfile;
+    }
+
+    private void SetIssueDetailPageActive(bool isActive)
+    {
+        if (_isIssueDetailPageActive == isActive)
+        {
+            return;
+        }
+
+        _isIssueDetailPageActive = isActive;
+        OnIssueNavigationPropertiesChanged();
+    }
+
+    private void SetDescriptionEditMode(bool isEditMode)
+    {
+        if (_isDescriptionEditMode == isEditMode)
+        {
+            return;
+        }
+
+        _isDescriptionEditMode = isEditMode;
+        OnPropertyChanged(nameof(IsDescriptionEditMode));
+        OnPropertyChanged(nameof(IsDescriptionReadMode));
+    }
+
+    private void SetCommentPreviewMode(bool isPreviewMode)
+    {
+        if (_isCommentPreviewMode == isPreviewMode)
+        {
+            return;
+        }
+
+        _isCommentPreviewMode = isPreviewMode;
+        OnPropertyChanged(nameof(IsCommentPreviewMode));
+        OnPropertyChanged(nameof(IsCommentWriteMode));
+    }
+
+    private void OnDraftCommentPreviewChanged()
+    {
+        // Write/Preview 탭은 저장 전 원문을 실제 댓글 렌더링과 같은 경로로 보여 줘야 한다.
+        // 그래서 본문과 포맷 중 하나라도 바뀌면 WebView 문서, fallback, 높이 추정을 함께 갱신한다.
+        OnPropertyChanged(nameof(DraftCommentPreviewHtmlDocument));
+        OnPropertyChanged(nameof(DraftCommentPreviewFallbackText));
+        OnPropertyChanged(nameof(DraftCommentPreviewHeight));
+    }
+
+    private void OnIssueNavigationPropertiesChanged()
+    {
+        // 이슈 목록과 상세를 별도 화면 상태로 분리해 GitHub Issues처럼 행 선택 시 상세로 진입하고,
+        // 뒤로 가기나 새 이슈 작성 준비 시에는 명확하게 목록 화면으로 돌아오게 한다.
+        OnPropertyChanged(nameof(IsIssuesViewActive));
+        OnPropertyChanged(nameof(IsIssueListViewVisible));
+        OnPropertyChanged(nameof(IsIssueDetailViewActive));
+        OnPropertyChanged(nameof(IsQuickCaptureVisible));
+        OnPropertyChanged(nameof(IsIssueEditorVisible));
+        OnPropertyChanged(nameof(IsIssueDetailPlaceholderVisible));
+        OnPropertyChanged(nameof(IsSelectedIssueDetailVisible));
     }
 
     private void ApplyProjectDetail(ProjectDetail detail)
@@ -2346,6 +2752,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         {
             EditTitle = string.Empty;
             EditDescription = string.Empty;
+            EditDescriptionFormat = IssueContentFormat.Markdown;
             EditAssignee = string.Empty;
             EditPriority = IssuePriority.None;
             EditDueDate = null;
@@ -2360,6 +2767,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         var summary = detail.Summary.Issue;
         EditTitle = summary.Title;
         EditDescription = detail.Detail.Description;
+        EditDescriptionFormat = detail.Detail.DescriptionFormat;
         EditAssignee = summary.AssigneeDisplayName ?? string.Empty;
         EditPriority = summary.Priority;
         EditDueDate = summary.DueDate is null
@@ -2398,6 +2806,129 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         IssueFilterScope.Closed => issue.IsClosed,
         _ => true,
     };
+
+    private bool MatchesIssueDropdownFilters(IssueCardViewModel issue)
+    {
+        return MatchesSelectedAssigneeFilter(issue)
+            && MatchesSelectedLabelFilter(issue)
+            && MatchesSelectedProjectFilter(issue)
+            && MatchesSelectedMilestoneFilter(issue)
+            && MatchesSelectedTypeFilter(issue);
+    }
+
+    private bool MatchesSelectedAssigneeFilter(IssueCardViewModel issue)
+    {
+        return SelectedIssueAssigneeFilter == AnyIssueAssigneeFilter
+            || SelectedIssueAssigneeFilter == UnassignedIssueFilter && !issue.HasAssignee
+            || issue.HasAssignee && issue.AssigneeText.Equals(SelectedIssueAssigneeFilter, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private bool MatchesSelectedLabelFilter(IssueCardViewModel issue)
+    {
+        return SelectedIssueLabelFilter == AnyIssueLabelFilter
+            || issue.Labels.Any(label => label.Equals(SelectedIssueLabelFilter, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private bool MatchesSelectedProjectFilter(IssueCardViewModel issue)
+    {
+        return SelectedIssueProjectFilter == AnyIssueProjectFilter
+            || SelectedIssueProjectFilter == NoProjectIssueFilter && !issue.HasProject
+            || issue.HasProject && issue.ProjectText.Equals(SelectedIssueProjectFilter, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private bool MatchesSelectedMilestoneFilter(IssueCardViewModel issue)
+    {
+        return SelectedIssueMilestoneFilter == AnyIssueMilestoneFilter
+            || SelectedIssueMilestoneFilter == NoMilestoneIssueFilter && !issue.HasMilestone
+            || issue.HasMilestone && issue.MilestoneText.Equals(SelectedIssueMilestoneFilter, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private bool MatchesSelectedTypeFilter(IssueCardViewModel issue)
+    {
+        return SelectedIssueTypeFilter == AnyIssueTypeFilter
+            || issue.HasIssueType && issue.IssueTypeText.Equals(SelectedIssueTypeFilter, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static IEnumerable<IssueCardViewModel> SortIssues(
+        IEnumerable<IssueCardViewModel> issues,
+        string sortOption)
+    {
+        return sortOption switch
+        {
+            "Oldest updated" => issues.OrderBy(static issue => issue.Issue.UpdatedAtUtc),
+            "Most commented" => issues
+                .OrderByDescending(static issue => issue.Issue.CommentCount)
+                .ThenByDescending(static issue => issue.Issue.UpdatedAtUtc),
+            "Least commented" => issues
+                .OrderBy(static issue => issue.Issue.CommentCount)
+                .ThenByDescending(static issue => issue.Issue.UpdatedAtUtc),
+            "Highest priority" => issues
+                .OrderBy(static issue => GetPrioritySortRank(issue.Issue.Priority))
+                .ThenByDescending(static issue => issue.Issue.UpdatedAtUtc),
+            "Due date" => issues
+                .OrderBy(static issue => issue.Issue.DueDate ?? DateOnly.MaxValue)
+                .ThenByDescending(static issue => issue.Issue.UpdatedAtUtc),
+            _ => issues.OrderByDescending(static issue => issue.Issue.UpdatedAtUtc),
+        };
+    }
+
+    private static int GetPrioritySortRank(IssuePriority priority) => priority switch
+    {
+        IssuePriority.Critical => 0,
+        IssuePriority.High => 1,
+        IssuePriority.Medium => 2,
+        IssuePriority.Low => 3,
+        _ => 4,
+    };
+
+    private string BuildIssueListSummary(int visibleIssueCount)
+    {
+        var terms = new List<string>
+        {
+            "is:issue",
+            ActiveScope switch
+            {
+                IssueFilterScope.Open => "state:open",
+                IssueFilterScope.Closed => "state:closed",
+                _ => "state:all",
+            },
+        };
+
+        if (!string.IsNullOrWhiteSpace(SearchText))
+        {
+            terms.Add(SearchText.Trim());
+        }
+
+        AddFilterPreview(terms, "assignee", SelectedIssueAssigneeFilter, AnyIssueAssigneeFilter, UnassignedIssueFilter, "none");
+        AddFilterPreview(terms, "label", SelectedIssueLabelFilter, AnyIssueLabelFilter);
+        AddFilterPreview(terms, "project", SelectedIssueProjectFilter, AnyIssueProjectFilter, NoProjectIssueFilter, "none");
+        AddFilterPreview(terms, "milestone", SelectedIssueMilestoneFilter, AnyIssueMilestoneFilter, NoMilestoneIssueFilter, "none");
+        AddFilterPreview(terms, "type", SelectedIssueTypeFilter, AnyIssueTypeFilter);
+
+        return $"{visibleIssueCount} issues matching {string.Join(" ", terms)}";
+    }
+
+    private static void AddFilterPreview(
+        List<string> terms,
+        string key,
+        string selectedValue,
+        string defaultValue,
+        string? emptyDisplayValue = null,
+        string? emptyQueryValue = null)
+    {
+        if (selectedValue == defaultValue)
+        {
+            return;
+        }
+
+        var queryValue = selectedValue == emptyDisplayValue
+            ? emptyQueryValue ?? selectedValue
+            : selectedValue.Contains(' ')
+                ? $"\"{selectedValue}\""
+                : selectedValue;
+
+        terms.Add($"{key}:{queryValue}");
+    }
 
     private static bool MatchesSearch(IssueCardViewModel issue, IssueSearchQuery searchQuery)
     {
@@ -2844,17 +3375,15 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
 
         if (preferredIssueId is not null)
         {
-            return filteredIssues.FirstOrDefault(issue => issue.Id == preferredIssueId.Value)
-                ?? filteredIssues[0];
+            return filteredIssues.FirstOrDefault(issue => issue.Id == preferredIssueId.Value);
         }
 
         if (SelectedIssue is not null)
         {
-            return filteredIssues.FirstOrDefault(issue => issue.Id == SelectedIssue.Id)
-                ?? filteredIssues[0];
+            return filteredIssues.FirstOrDefault(issue => issue.Id == SelectedIssue.Id);
         }
 
-        return filteredIssues[0];
+        return null;
     }
 
     private ProjectSummaryViewModel? SelectPreferredProject(

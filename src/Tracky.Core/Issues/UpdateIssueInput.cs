@@ -10,4 +10,5 @@ public sealed record UpdateIssueInput(
     string? ProjectName,
     IReadOnlyList<string> Labels,
     string? MilestoneName = null,
-    string? IssueTypeName = null);
+    string? IssueTypeName = null,
+    IssueContentFormat ContentFormat = IssueContentFormat.Markdown);

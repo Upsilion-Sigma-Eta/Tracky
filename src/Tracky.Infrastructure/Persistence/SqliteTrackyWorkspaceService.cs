@@ -98,7 +98,15 @@ public sealed class SqliteTrackyWorkspaceService(TrackyWorkspacePathProvider pat
         var reminders = await GetIssueRemindersAsync(connection, issueId, cancellationToken);
         var relations = await GetIssueRelationsAsync(connection, issueId, cancellationToken);
 
-        return new IssueDetail(summary, description, comments, attachments, activity, reminders, relations);
+        return new IssueDetail(
+            summary,
+            description.Body,
+            description.Format,
+            comments,
+            attachments,
+            activity,
+            reminders,
+            relations);
     }
 
     public async Task<IssueListItem> CreateIssueAsync(
@@ -125,6 +133,7 @@ public sealed class SqliteTrackyWorkspaceService(TrackyWorkspacePathProvider pat
                 issue_number,
                 title,
                 description,
+                description_format,
                 state,
                 state_reason,
                 priority,
@@ -143,6 +152,7 @@ public sealed class SqliteTrackyWorkspaceService(TrackyWorkspacePathProvider pat
                 $issueNumber,
                 $title,
                 $description,
+                $descriptionFormat,
                 $state,
                 $stateReason,
                 $priority,
@@ -163,7 +173,10 @@ public sealed class SqliteTrackyWorkspaceService(TrackyWorkspacePathProvider pat
         createIssueCommand.Parameters.AddWithValue("$title", input.Title.Trim());
         createIssueCommand.Parameters.AddWithValue(
             "$description",
-            "Created from the Phase 1 quick capture flow. The next step is to expand this into the full issue body editor.");
+            input.Description is null
+                ? "Created from the Phase 1 quick capture flow. The next step is to expand this into the full issue body editor."
+                : input.Description.Trim());
+        createIssueCommand.Parameters.AddWithValue("$descriptionFormat", SerializeContentFormat(input.ContentFormat));
         createIssueCommand.Parameters.AddWithValue("$state", SerializeState(IssueWorkflowState.Open));
         createIssueCommand.Parameters.AddWithValue("$stateReason", SerializeReason(IssueStateReason.None));
         createIssueCommand.Parameters.AddWithValue("$priority", SerializePriority(input.Priority));
@@ -247,6 +260,7 @@ public sealed class SqliteTrackyWorkspaceService(TrackyWorkspacePathProvider pat
             UPDATE issues
             SET title = $title,
                 description = $description,
+                description_format = $descriptionFormat,
                 priority = $priority,
                 assignee_display_name = $assignee,
                 due_date = $dueDate,
@@ -259,6 +273,7 @@ public sealed class SqliteTrackyWorkspaceService(TrackyWorkspacePathProvider pat
         updateCommand.Parameters.AddWithValue("$id", input.IssueId.ToString());
         updateCommand.Parameters.AddWithValue("$title", input.Title.Trim());
         updateCommand.Parameters.AddWithValue("$description", input.Description.Trim());
+        updateCommand.Parameters.AddWithValue("$descriptionFormat", SerializeContentFormat(input.ContentFormat));
         updateCommand.Parameters.AddWithValue("$priority", SerializePriority(input.Priority));
         updateCommand.Parameters.AddWithValue("$assignee", (object?)Normalize(input.AssigneeDisplayName) ?? DBNull.Value);
         updateCommand.Parameters.AddWithValue("$dueDate", (object?)SerializeDate(input.DueDate) ?? DBNull.Value);
@@ -399,6 +414,7 @@ public sealed class SqliteTrackyWorkspaceService(TrackyWorkspacePathProvider pat
             input.IssueId,
             Normalize(input.AuthorDisplayName)!,
             input.Body.Trim(),
+            input.BodyFormat,
             DateTimeOffset.UtcNow,
             cancellationToken);
 
@@ -1007,6 +1023,7 @@ public sealed class SqliteTrackyWorkspaceService(TrackyWorkspacePathProvider pat
                 issue_number INTEGER NOT NULL UNIQUE,
                 title TEXT NOT NULL,
                 description TEXT NOT NULL DEFAULT '',
+                description_format TEXT NOT NULL DEFAULT 'markdown',
                 state TEXT NOT NULL,
                 state_reason TEXT NOT NULL,
                 priority TEXT NOT NULL,
@@ -1068,6 +1085,7 @@ public sealed class SqliteTrackyWorkspaceService(TrackyWorkspacePathProvider pat
                 issue_id TEXT NOT NULL,
                 author_display_name TEXT NOT NULL,
                 body TEXT NOT NULL,
+                body_format TEXT NOT NULL DEFAULT 'markdown',
                 created_utc TEXT NOT NULL,
                 FOREIGN KEY (issue_id) REFERENCES issues(id) ON DELETE CASCADE
             );
@@ -1217,6 +1235,18 @@ public sealed class SqliteTrackyWorkspaceService(TrackyWorkspacePathProvider pat
         await command.ExecuteNonQueryAsync(cancellationToken);
 
         await EnsureColumnAsync(connection, "issues", "description", "TEXT NOT NULL DEFAULT ''", cancellationToken);
+        await EnsureColumnAsync(
+            connection,
+            "issues",
+            "description_format",
+            "TEXT NOT NULL DEFAULT 'markdown'",
+            cancellationToken);
+        await EnsureColumnAsync(
+            connection,
+            "issue_comments",
+            "body_format",
+            "TEXT NOT NULL DEFAULT 'markdown'",
+            cancellationToken);
         await EnsureColumnAsync(connection, "issues", "milestone_name", "TEXT NULL", cancellationToken);
         await EnsureColumnAsync(connection, "issues", "issue_type_name", "TEXT NULL", cancellationToken);
         await EnsureColumnAsync(
@@ -1615,6 +1645,7 @@ public sealed class SqliteTrackyWorkspaceService(TrackyWorkspacePathProvider pat
             workspaceShellIssueId,
             "Dabin",
             "The shell already feels much closer to a real product once the workspace summary and navigation scaffolding are visible together.",
+            IssueContentFormat.Markdown,
             now.AddHours(-5.5),
             cancellationToken);
 
@@ -1624,6 +1655,7 @@ public sealed class SqliteTrackyWorkspaceService(TrackyWorkspacePathProvider pat
             hierarchyIssueId,
             "Dabin",
             "The home screen needs to show overdue and due-today items without hiding the broader issue queue.",
+            IssueContentFormat.Markdown,
             now.AddHours(-2.4),
             cancellationToken);
 
@@ -1633,6 +1665,7 @@ public sealed class SqliteTrackyWorkspaceService(TrackyWorkspacePathProvider pat
             hierarchyIssueId,
             "Tracky",
             "A denser right panel is acceptable as long as issue creation and state changes remain one click away.",
+            IssueContentFormat.Markdown,
             now.AddHours(-2.1),
             cancellationToken);
 
@@ -1642,6 +1675,7 @@ public sealed class SqliteTrackyWorkspaceService(TrackyWorkspacePathProvider pat
             stateReasonIssueId,
             "Dabin",
             "Closing with explicit reasons will matter later for search operators like reason:duplicate and exports.",
+            IssueContentFormat.Markdown,
             now.AddHours(-29),
             cancellationToken);
 
@@ -1857,6 +1891,7 @@ public sealed class SqliteTrackyWorkspaceService(TrackyWorkspacePathProvider pat
         Guid issueId,
         string authorDisplayName,
         string body,
+        IssueContentFormat bodyFormat,
         DateTimeOffset createdAtUtc,
         CancellationToken cancellationToken)
     {
@@ -1865,13 +1900,14 @@ public sealed class SqliteTrackyWorkspaceService(TrackyWorkspacePathProvider pat
         command.Transaction = transaction;
         command.CommandText =
             """
-            INSERT INTO issue_comments (id, issue_id, author_display_name, body, created_utc)
-            VALUES ($id, $issueId, $authorDisplayName, $body, $createdUtc);
+            INSERT INTO issue_comments (id, issue_id, author_display_name, body, body_format, created_utc)
+            VALUES ($id, $issueId, $authorDisplayName, $body, $bodyFormat, $createdUtc);
             """;
         command.Parameters.AddWithValue("$id", commentId.ToString());
         command.Parameters.AddWithValue("$issueId", issueId.ToString());
         command.Parameters.AddWithValue("$authorDisplayName", authorDisplayName);
         command.Parameters.AddWithValue("$body", body);
+        command.Parameters.AddWithValue("$bodyFormat", SerializeContentFormat(bodyFormat));
         command.Parameters.AddWithValue("$createdUtc", SerializeTimestamp(createdAtUtc));
         await command.ExecuteNonQueryAsync(cancellationToken);
 
@@ -1885,7 +1921,7 @@ public sealed class SqliteTrackyWorkspaceService(TrackyWorkspacePathProvider pat
             createdAtUtc,
             cancellationToken);
 
-        return new IssueComment(commentId, issueId, authorDisplayName, body, createdAtUtc);
+        return new IssueComment(commentId, issueId, authorDisplayName, body, bodyFormat, createdAtUtc);
     }
 
     private static async Task<IssueAttachment> InsertAttachmentAsync(
@@ -2343,7 +2379,7 @@ public sealed class SqliteTrackyWorkspaceService(TrackyWorkspacePathProvider pat
             .AppendLine()
             .AppendLine("## Description")
             .AppendLine()
-            .AppendLine(FormatBodyForExport(description, options.BodyFormat))
+            .AppendLine(FormatBodyForExport(description.Body, description.Format, options.BodyFormat))
             .AppendLine();
 
         if (options.IncludeComments)
@@ -2357,7 +2393,7 @@ public sealed class SqliteTrackyWorkspaceService(TrackyWorkspacePathProvider pat
                     .Append(" at ")
                     .AppendLine(comment.CreatedAtUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture))
                     .AppendLine()
-                    .AppendLine(FormatBodyForExport(comment.Body, options.BodyFormat))
+                    .AppendLine(FormatBodyForExport(comment.Body, comment.BodyFormat, options.BodyFormat))
                     .AppendLine();
             }
         }
@@ -2833,11 +2869,19 @@ public sealed class SqliteTrackyWorkspaceService(TrackyWorkspacePathProvider pat
         return labels.Count == 0 ? "None" : string.Join(", ", labels);
     }
 
-    private static string FormatBodyForExport(string body, ExportBodyFormat bodyFormat)
+    private static string FormatBodyForExport(
+        string body,
+        IssueContentFormat sourceFormat,
+        ExportBodyFormat bodyFormat)
     {
-        return bodyFormat == ExportBodyFormat.Html
-            ? ConvertMarkdownToHtml(body)
-            : body;
+        if (bodyFormat == ExportBodyFormat.Markdown)
+        {
+            return body;
+        }
+
+        return sourceFormat == IssueContentFormat.Html
+            ? body
+            : ConvertMarkdownToHtml(body);
     }
 
     private static string ConvertMarkdownToHtml(string markdown)
@@ -3637,7 +3681,7 @@ public sealed class SqliteTrackyWorkspaceService(TrackyWorkspacePathProvider pat
         command.Transaction = transaction;
         command.CommandText =
             """
-            SELECT title, description, priority, assignee_display_name, due_date, project_name, milestone_name, issue_type_name
+            SELECT title, description, description_format, priority, assignee_display_name, due_date, project_name, milestone_name, issue_type_name
             FROM issues
             WHERE id = $id
             LIMIT 1;
@@ -3646,6 +3690,7 @@ public sealed class SqliteTrackyWorkspaceService(TrackyWorkspacePathProvider pat
 
         string title;
         string description;
+        IssueContentFormat descriptionFormat;
         IssuePriority priority;
         string? assigneeDisplayName;
         DateOnly? dueDate;
@@ -3661,18 +3706,20 @@ public sealed class SqliteTrackyWorkspaceService(TrackyWorkspacePathProvider pat
 
             title = reader.GetString(0);
             description = reader.GetString(1);
-            priority = ParsePriority(reader.GetString(2));
-            assigneeDisplayName = reader.IsDBNull(3) ? null : reader.GetString(3);
-            dueDate = reader.IsDBNull(4) ? null : ParseStoredDate(reader.GetString(4));
-            projectName = reader.IsDBNull(5) ? null : reader.GetString(5);
-            milestoneName = reader.IsDBNull(6) ? null : reader.GetString(6);
-            issueTypeName = reader.IsDBNull(7) ? null : reader.GetString(7);
+            descriptionFormat = ParseContentFormat(reader.GetString(2));
+            priority = ParsePriority(reader.GetString(3));
+            assigneeDisplayName = reader.IsDBNull(4) ? null : reader.GetString(4);
+            dueDate = reader.IsDBNull(5) ? null : ParseStoredDate(reader.GetString(5));
+            projectName = reader.IsDBNull(6) ? null : reader.GetString(6);
+            milestoneName = reader.IsDBNull(7) ? null : reader.GetString(7);
+            issueTypeName = reader.IsDBNull(8) ? null : reader.GetString(8);
         }
 
         var labels = await GetIssueLabelsForUpdateAsync(connection, transaction, issueId, cancellationToken);
         return new IssueUpdateSnapshot(
             title,
             description,
+            descriptionFormat,
             priority,
             assigneeDisplayName,
             dueDate,
@@ -3726,6 +3773,11 @@ public sealed class SqliteTrackyWorkspaceService(TrackyWorkspacePathProvider pat
         if (!string.Equals(snapshot.Description, input.Description.Trim(), StringComparison.Ordinal))
         {
             changes.Add("body");
+        }
+
+        if (snapshot.ContentFormat != input.ContentFormat)
+        {
+            changes.Add($"body format from {SerializeContentFormat(snapshot.ContentFormat)} to {SerializeContentFormat(input.ContentFormat)}");
         }
 
         if (snapshot.Priority != input.Priority)
@@ -4407,7 +4459,7 @@ public sealed class SqliteTrackyWorkspaceService(TrackyWorkspacePathProvider pat
         return await command.ExecuteScalarAsync(cancellationToken) as string;
     }
 
-    private static async Task<string> GetIssueDescriptionAsync(
+    private static async Task<IssueDescriptionRow> GetIssueDescriptionAsync(
         SqliteConnection connection,
         Guid issueId,
         CancellationToken cancellationToken)
@@ -4415,15 +4467,22 @@ public sealed class SqliteTrackyWorkspaceService(TrackyWorkspacePathProvider pat
         var command = connection.CreateCommand();
         command.CommandText =
             """
-            SELECT description
+            SELECT description, description_format
             FROM issues
             WHERE id = $id
             LIMIT 1;
             """;
         command.Parameters.AddWithValue("$id", issueId.ToString());
 
-        var result = await command.ExecuteScalarAsync(cancellationToken);
-        return result as string ?? string.Empty;
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        if (!await reader.ReadAsync(cancellationToken))
+        {
+            return new IssueDescriptionRow(string.Empty, IssueContentFormat.Markdown);
+        }
+
+        return new IssueDescriptionRow(
+            reader.GetString(0),
+            ParseContentFormat(reader.GetString(1)));
     }
 
     private static async Task<IReadOnlyList<IssueComment>> GetIssueCommentsAsync(
@@ -4434,7 +4493,7 @@ public sealed class SqliteTrackyWorkspaceService(TrackyWorkspacePathProvider pat
         var command = connection.CreateCommand();
         command.CommandText =
             """
-            SELECT id, issue_id, author_display_name, body, created_utc
+            SELECT id, issue_id, author_display_name, body, body_format, created_utc
             FROM issue_comments
             WHERE issue_id = $issueId
             ORDER BY created_utc ASC;
@@ -4452,7 +4511,8 @@ public sealed class SqliteTrackyWorkspaceService(TrackyWorkspacePathProvider pat
                     Guid.Parse(reader.GetString(1)),
                     reader.GetString(2),
                     reader.GetString(3),
-                    ParseStoredTimestamp(reader.GetString(4))));
+                    ParseContentFormat(reader.GetString(4)),
+                    ParseStoredTimestamp(reader.GetString(5))));
         }
 
         return comments;
@@ -4693,17 +4753,20 @@ public sealed class SqliteTrackyWorkspaceService(TrackyWorkspacePathProvider pat
 
     private static string SerializeTheme(AppThemePreference theme) => theme switch
     {
-        AppThemePreference.System => "system",
-        AppThemePreference.Light => "light",
-        AppThemePreference.Dark => "dark",
+        AppThemePreference.WhiteBlue => "white_blue",
+        AppThemePreference.BlueOrange => "blue_orange",
+        AppThemePreference.DarkBlue => "dark_blue",
+        AppThemePreference.DarkOrange => "dark_orange",
         _ => throw new ArgumentOutOfRangeException(nameof(theme), theme, null),
     };
 
     private static AppThemePreference ParseTheme(string theme) => theme switch
     {
-        "system" => AppThemePreference.System,
-        "dark" => AppThemePreference.Dark,
-        _ => AppThemePreference.Light,
+        "blue_orange" => AppThemePreference.BlueOrange,
+        "dark_blue" or "dark" => AppThemePreference.DarkBlue,
+        "dark_orange" => AppThemePreference.DarkOrange,
+        // 기존 light/system 저장값은 신규 4팔레트 체계의 기본 라이트 테마로 승격한다.
+        _ => AppThemePreference.WhiteBlue,
     };
 
     private static string GetIssueTypeColor(string issueTypeName)
@@ -4763,6 +4826,19 @@ public sealed class SqliteTrackyWorkspaceService(TrackyWorkspacePathProvider pat
     {
         "html" => ExportBodyFormat.Html,
         _ => ExportBodyFormat.Markdown,
+    };
+
+    private static string SerializeContentFormat(IssueContentFormat format) => format switch
+    {
+        IssueContentFormat.Markdown => "markdown",
+        IssueContentFormat.Html => "html",
+        _ => throw new ArgumentOutOfRangeException(nameof(format), format, null),
+    };
+
+    private static IssueContentFormat ParseContentFormat(string format) => format switch
+    {
+        "html" => IssueContentFormat.Html,
+        _ => IssueContentFormat.Markdown,
     };
 
     private static string NormalizeBoardColumn(string boardColumn)
@@ -4847,6 +4923,8 @@ public sealed class SqliteTrackyWorkspaceService(TrackyWorkspacePathProvider pat
 
     private sealed record WorkspaceRow(string Id, string Name, string Description);
 
+    private sealed record IssueDescriptionRow(string Body, IssueContentFormat Format);
+
     private sealed record ProjectIssueSyncRow(
         Guid IssueId,
         string WorkspaceId,
@@ -4864,6 +4942,7 @@ public sealed class SqliteTrackyWorkspaceService(TrackyWorkspacePathProvider pat
     private sealed record IssueUpdateSnapshot(
         string Title,
         string Description,
+        IssueContentFormat ContentFormat,
         IssuePriority Priority,
         string? AssigneeDisplayName,
         DateOnly? DueDate,

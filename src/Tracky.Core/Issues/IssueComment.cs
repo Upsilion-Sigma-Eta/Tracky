@@ -7,4 +7,5 @@ public sealed record IssueComment(
     Guid IssueId,
     string AuthorDisplayName,
     string Body,
+    IssueContentFormat BodyFormat,
     DateTimeOffset CreatedAtUtc);

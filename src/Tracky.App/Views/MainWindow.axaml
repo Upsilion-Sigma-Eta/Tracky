@@ -1,5 +1,6 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:controls="using:Tracky.App.Controls"
         xmlns:vm="using:Tracky.App.ViewModels"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
@@ -29,17 +30,17 @@
             <Setter Property="Background" Value="{StaticResource TrackySurfaceBrush}" />
             <Setter Property="BorderBrush" Value="{StaticResource TrackyBorderBrush}" />
             <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="CornerRadius" Value="24" />
+            <Setter Property="CornerRadius" Value="6" />
         </Style>
 
         <Style Selector="TextBlock.hero-title">
-            <Setter Property="FontSize" Value="30" />
+            <Setter Property="FontSize" Value="24" />
             <Setter Property="FontWeight" Value="SemiBold" />
             <Setter Property="Foreground" Value="{StaticResource TrackyInkBrush}" />
         </Style>
 
         <Style Selector="TextBlock.section-title">
-            <Setter Property="FontSize" Value="20" />
+            <Setter Property="FontSize" Value="16" />
             <Setter Property="FontWeight" Value="SemiBold" />
             <Setter Property="Foreground" Value="{StaticResource TrackyInkBrush}" />
         </Style>
@@ -60,6 +61,44 @@
             <Setter Property="FontSize" Value="14" />
         </Style>
 
+        <Style Selector="TextBlock.render-block">
+            <Setter Property="Foreground" Value="{StaticResource TrackyInkBrush}" />
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="LineHeight" Value="21" />
+            <Setter Property="Margin" Value="0,0,0,8" />
+        </Style>
+
+        <Style Selector="TextBlock.render-block.heading1">
+            <Setter Property="FontSize" Value="24" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="LineHeight" Value="30" />
+            <Setter Property="Margin" Value="0,0,0,12" />
+        </Style>
+
+        <Style Selector="TextBlock.render-block.heading2">
+            <Setter Property="FontSize" Value="20" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="LineHeight" Value="26" />
+            <Setter Property="Margin" Value="0,4,0,10" />
+        </Style>
+
+        <Style Selector="TextBlock.render-block.heading3">
+            <Setter Property="FontSize" Value="17" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="LineHeight" Value="23" />
+            <Setter Property="Margin" Value="0,3,0,8" />
+        </Style>
+
+        <Style Selector="TextBlock.render-block.code">
+            <Setter Property="FontFamily" Value="Consolas, Cascadia Mono, Menlo" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="LineHeight" Value="19" />
+        </Style>
+
+        <Style Selector="TextBlock.render-block.quote">
+            <Setter Property="Foreground" Value="{StaticResource TrackyMutedInkBrush}" />
+        </Style>
+
         <Style Selector="TextBlock.muted">
             <Setter Property="Foreground" Value="{StaticResource TrackyMutedInkBrush}" />
             <Setter Property="FontSize" Value="13" />
@@ -77,28 +116,40 @@
             <Setter Property="Foreground" Value="{StaticResource TrackyNavMutedInkBrush}" />
             <Setter Property="BorderBrush" Value="Transparent" />
             <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="CornerRadius" Value="16" />
+            <Setter Property="CornerRadius" Value="6" />
             <Setter Property="Padding" Value="14,12" />
         </Style>
 
         <Style Selector="Button.nav-item.active">
-            <Setter Property="Background" Value="#2C2C2C" />
+            <Setter Property="Background" Value="{StaticResource TrackyNavActiveBrush}" />
             <Setter Property="Foreground" Value="{StaticResource TrackyNavInkBrush}" />
-            <Setter Property="BorderBrush" Value="#3F3F46" />
+            <Setter Property="BorderBrush" Value="{StaticResource TrackyNavActiveBrush}" />
+        </Style>
+
+        <Style Selector="Button.nav-item:pointerover">
+            <Setter Property="Background" Value="{StaticResource TrackyNavHoverBrush}" />
+            <Setter Property="Foreground" Value="{StaticResource TrackyNavInkBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource TrackyNavBorderBrush}" />
+        </Style>
+
+        <Style Selector="Button.nav-item.active:pointerover">
+            <Setter Property="Background" Value="{StaticResource TrackyNavActiveBrush}" />
+            <Setter Property="Foreground" Value="{StaticResource TrackyNavInkBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource TrackyNavActiveBrush}" />
         </Style>
 
         <Style Selector="Button.scope-chip">
-            <Setter Property="Background" Value="#F5F5F4" />
+            <Setter Property="Background" Value="Transparent" />
             <Setter Property="BorderBrush" Value="{StaticResource TrackyBorderBrush}" />
             <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="CornerRadius" Value="999" />
+            <Setter Property="CornerRadius" Value="6" />
             <Setter Property="Foreground" Value="{StaticResource TrackyMutedInkBrush}" />
-            <Setter Property="Padding" Value="14,8" />
+            <Setter Property="Padding" Value="12,7" />
         </Style>
 
         <Style Selector="Button.scope-chip.active">
-            <Setter Property="Background" Value="{StaticResource TrackyAccentSoftBrush}" />
-            <Setter Property="BorderBrush" Value="{StaticResource TrackyAccentBrush}" />
+            <Setter Property="Background" Value="{StaticResource TrackySurfaceStrongBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource TrackyBorderBrush}" />
             <Setter Property="Foreground" Value="{StaticResource TrackyAccentBrush}" />
         </Style>
 
@@ -107,39 +158,82 @@
             <Setter Property="Foreground" Value="White" />
             <Setter Property="BorderBrush" Value="{StaticResource TrackyAccentBrush}" />
             <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="CornerRadius" Value="16" />
-            <Setter Property="Padding" Value="14,10" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="Padding" Value="12,8" />
         </Style>
 
         <Style Selector="Button.secondary">
-            <Setter Property="Background" Value="#F5F5F4" />
+            <Setter Property="Background" Value="{StaticResource TrackySurfaceStrongBrush}" />
             <Setter Property="Foreground" Value="{StaticResource TrackyInkBrush}" />
             <Setter Property="BorderBrush" Value="{StaticResource TrackyBorderBrush}" />
             <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="CornerRadius" Value="16" />
-            <Setter Property="Padding" Value="14,10" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="Padding" Value="12,8" />
         </Style>
 
         <Style Selector="TextBox.search-box">
-            <Setter Property="Background" Value="{StaticResource TrackySurfaceStrongBrush}" />
+            <Setter Property="Background" Value="{StaticResource TrackySurfaceBrush}" />
             <Setter Property="BorderBrush" Value="{StaticResource TrackyBorderBrush}" />
             <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="CornerRadius" Value="16" />
-            <Setter Property="Padding" Value="14,12" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="Padding" Value="12,9" />
         </Style>
 
         <Style Selector="ListBoxItem">
             <Setter Property="Padding" Value="0" />
-            <Setter Property="Margin" Value="0,0,0,12" />
+            <Setter Property="Margin" Value="0" />
             <Setter Property="Background" Value="Transparent" />
         </Style>
 
         <Style Selector="ScrollBar">
             <Setter Property="Opacity" Value="0.8" />
         </Style>
+
+        <Style Selector="Button.github-tab">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0,0,0,2" />
+            <Setter Property="CornerRadius" Value="0" />
+            <Setter Property="Foreground" Value="{StaticResource TrackyInkBrush}" />
+            <Setter Property="Padding" Value="12,12" />
+        </Style>
+
+        <Style Selector="Button.github-tab.active">
+            <Setter Property="BorderBrush" Value="{StaticResource TrackyAccentBrush}" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+
+        <Style Selector="Button.header-filter">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+            <Setter Property="Foreground" Value="{StaticResource TrackyMutedInkBrush}" />
+            <Setter Property="Padding" Value="8,6" />
+        </Style>
+
+        <Style Selector="ComboBox.header-filter">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+            <Setter Property="Foreground" Value="{StaticResource TrackyMutedInkBrush}" />
+            <Setter Property="Padding" Value="8,6" />
+            <Setter Property="MinWidth" Value="104" />
+        </Style>
+
+        <Style Selector="Border.issue-row">
+            <Setter Property="Background" Value="{StaticResource TrackySurfaceBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource TrackyBorderBrush}" />
+            <Setter Property="BorderThickness" Value="0,0,0,1" />
+            <Setter Property="CornerRadius" Value="0" />
+            <Setter Property="Padding" Value="16,13" />
+        </Style>
+
+        <Style Selector="TextBlock.issue-title">
+            <Setter Property="FontSize" Value="16" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{StaticResource TrackyInkBrush}" />
+        </Style>
     </Window.Styles>
 
-    <Grid ColumnDefinitions="236,*,340" ColumnSpacing="20" Margin="20">
+    <Grid ColumnDefinitions="236,*,0" ColumnSpacing="20" Margin="20">
         <!-- 왼쪽 앱 셸은 이후 Projects, Labels, Saved Views를 붙일 수 있도록 구조만 먼저 고정한다. -->
         <Border Grid.Column="0"
                 Background="{StaticResource TrackyNavBrush}"
@@ -156,8 +250,8 @@
                 </StackPanel>
 
                 <Border Grid.Row="1"
-                        Background="#222222"
-                        BorderBrush="#323232"
+                        Background="{StaticResource TrackyNavHoverBrush}"
+                        BorderBrush="{StaticResource TrackyNavBorderBrush}"
                         BorderThickness="1"
                         CornerRadius="10"
                         Padding="16">
@@ -191,8 +285,8 @@
                 </StackPanel>
 
                 <Border Grid.Row="3"
-                        Background="#222222"
-                        BorderBrush="#323232"
+                        Background="{StaticResource TrackyNavHoverBrush}"
+                        BorderBrush="{StaticResource TrackyNavBorderBrush}"
                         BorderThickness="1"
                         CornerRadius="10"
                         Padding="16">
@@ -211,181 +305,239 @@
 
         <Grid Grid.Column="1"
               RowDefinitions="Auto,Auto,*,Auto"
-              RowSpacing="18"
-              IsVisible="{Binding IsIssuesViewActive}">
-            <Border Classes="surface" Padding="24">
-                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="20">
-                    <StackPanel Spacing="8">
-                        <TextBlock Classes="hero-title" Text="All Issues" />
-                        <TextBlock Classes="body"
-                                   Text="{Binding WorkspaceDescription}"
-                                   TextWrapping="Wrap" />
-                        <TextBlock Classes="mono"
+              RowSpacing="16"
+              IsVisible="{Binding IsIssueListViewVisible}">
+            <Border BorderBrush="{StaticResource TrackyBorderBrush}"
+                    BorderThickness="0,0,0,1"
+                    Padding="0,0,0,8">
+                <Grid RowDefinitions="Auto,Auto" RowSpacing="12">
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16">
+                        <StackPanel Spacing="6">
+                            <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                <TextBlock Classes="hero-title" Text="{Binding WorkspaceName}" />
+                                <Border Background="{StaticResource TrackySurfaceStrongBrush}"
+                                        BorderBrush="{StaticResource TrackyBorderBrush}"
+                                        BorderThickness="1"
+                                        CornerRadius="999"
+                                        Padding="8,2"
+                                        VerticalAlignment="Center">
+                                    <TextBlock Classes="muted" FontSize="12" Text="Local" />
+                                </Border>
+                            </StackPanel>
+                            <TextBlock Classes="muted"
+                                       Text="{Binding WorkspaceDescription}"
+                                       TextWrapping="Wrap" />
+                        </StackPanel>
+
+                        <TextBlock Grid.Column="1"
+                                   Classes="mono"
+                                   Width="320"
                                    Text="{Binding DatabasePath}"
                                    TextWrapping="Wrap" />
-                    </StackPanel>
+                    </Grid>
 
-                    <StackPanel Grid.Column="1" Spacing="12" Width="360">
-                        <TextBox x:Name="SearchBox"
-                                 Classes="search-box"
-                                 Watermark="Search with is:open label:bug assignee:me due:today"
-                                 Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}" />
-                        <Button x:Name="RefreshWorkspaceButton"
-                                Classes="secondary"
-                                Command="{Binding RefreshCommand}"
-                                Content="Refresh local workspace" />
+                    <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="2">
+                        <Button Classes="github-tab" Content="Code" IsEnabled="False" />
+                        <Button Classes="github-tab active"
+                                Classes.active="{Binding IsIssuesViewActive}"
+                                Command="{Binding ShowIssuesCommand}"
+                                Content="{Binding TotalIssues, StringFormat='Issues {0}'}" />
+                        <Button Classes="github-tab" Content="Pull requests" IsEnabled="False" />
+                        <Button Classes="github-tab"
+                                Command="{Binding ShowProjectsCommand}"
+                                Content="Projects" />
+                        <Button Classes="github-tab" Content="Milestones" IsEnabled="False" />
+                        <Button Classes="github-tab" Content="Insights" IsEnabled="False" />
                     </StackPanel>
                 </Grid>
             </Border>
 
-            <Grid Grid.Row="1" ColumnDefinitions="*,*,*,*,*" ColumnSpacing="14">
-                <Border Grid.Column="0" Classes="surface" Padding="18">
-                    <StackPanel Spacing="8">
-                        <TextBlock Classes="metric-label" Text="Total issues" />
-                        <TextBlock Classes="metric-value" Text="{Binding TotalIssues}" />
-                    </StackPanel>
-                </Border>
-                <Border Grid.Column="1" Classes="surface" Padding="18">
-                    <StackPanel Spacing="8">
-                        <TextBlock Classes="metric-label" Text="Open" />
-                        <TextBlock Classes="metric-value" Text="{Binding OpenIssues}" />
-                    </StackPanel>
-                </Border>
-                <Border Grid.Column="2" Classes="surface" Padding="18">
-                    <StackPanel Spacing="8">
-                        <TextBlock Classes="metric-label" Text="Closed" />
-                        <TextBlock Classes="metric-value" Text="{Binding ClosedIssues}" />
-                    </StackPanel>
-                </Border>
-                <Border Grid.Column="3" Classes="surface" Padding="18">
-                    <StackPanel Spacing="8">
-                        <TextBlock Classes="metric-label" Text="Overdue" />
-                        <TextBlock Classes="metric-value" Text="{Binding OverdueIssues}" />
-                    </StackPanel>
-                </Border>
-                <Border Grid.Column="4" Classes="surface" Padding="18">
-                    <StackPanel Spacing="8">
-                        <TextBlock Classes="metric-label" Text="Due today" />
-                        <TextBlock Classes="metric-value" Text="{Binding DueTodayIssues}" />
-                    </StackPanel>
-                </Border>
+            <Grid Grid.Row="1" ColumnDefinitions="Auto,*,Auto,Auto,Auto,Auto" ColumnSpacing="8">
+                <Button Classes="secondary"
+                        Content="Filters"
+                        IsEnabled="False" />
+                <TextBox x:Name="SearchBox"
+                         Grid.Column="1"
+                         Classes="search-box"
+                         PlaceholderText="is:issue state:open label:bug assignee:me due:today"
+                         Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}" />
+                <Button x:Name="RefreshWorkspaceButton"
+                        Grid.Column="2"
+                        Classes="secondary"
+                        Command="{Binding RefreshCommand}"
+                        Content="Search" />
+                <Button Grid.Column="3"
+                        Classes="secondary"
+                        Content="Labels"
+                        IsEnabled="False" />
+                <Button Grid.Column="4"
+                        Classes="secondary"
+                        Content="Milestones"
+                        IsEnabled="False" />
+                <Button Grid.Column="5"
+                        Classes="primary"
+                        Command="{Binding PrepareNewIssueCommand}"
+                        Content="New issue" />
             </Grid>
 
-            <Border Grid.Row="2" Classes="surface" Padding="22">
-                <Grid RowDefinitions="Auto,*" RowSpacing="18">
-                    <Grid ColumnDefinitions="Auto,Auto,Auto,*" ColumnSpacing="10">
-                        <Button Classes="scope-chip"
-                                Classes.active="{Binding IsAllScopeActive}"
-                                Command="{Binding ShowAllCommand}"
-                                Content="All" />
-                        <Button Grid.Column="1"
-                                Classes="scope-chip"
-                                Classes.active="{Binding IsOpenScopeActive}"
-                                Command="{Binding ShowOpenCommand}"
-                                Content="Open" />
-                        <Button Grid.Column="2"
-                                Classes="scope-chip"
-                                Classes.active="{Binding IsClosedScopeActive}"
-                                Command="{Binding ShowClosedCommand}"
-                                Content="Closed" />
-                        <TextBlock Grid.Column="3"
-                                   Classes="muted"
-                                   HorizontalAlignment="Right"
-                                   VerticalAlignment="Center"
-                                   Text="{Binding UpcomingIssues, StringFormat='Upcoming {0}'}" />
-                    </Grid>
+            <Border Grid.Row="2"
+                    Classes="surface"
+                    ClipToBounds="True"
+                    Padding="0">
+                <Grid RowDefinitions="Auto,Auto,*">
+                    <Border Background="{StaticResource TrackySurfaceStrongBrush}"
+                            Padding="14,8">
+                        <WrapPanel>
+                            <Button Classes="scope-chip"
+                                    Classes.active="{Binding IsAllScopeActive}"
+                                    Command="{Binding ShowAllCommand}"
+                                    Margin="0,0,8,8"
+                                    Content="{Binding TotalIssues, StringFormat='All {0}'}" />
+                            <Button Classes="scope-chip"
+                                    Classes.active="{Binding IsOpenScopeActive}"
+                                    Command="{Binding ShowOpenCommand}"
+                                    Margin="0,0,8,8"
+                                    Content="{Binding OpenIssues, StringFormat='Open {0}'}" />
+                            <Button Classes="scope-chip"
+                                    Classes.active="{Binding IsClosedScopeActive}"
+                                    Command="{Binding ShowClosedCommand}"
+                                    Margin="0,0,8,8"
+                                    Content="{Binding ClosedIssues, StringFormat='Closed {0}'}" />
+
+                            <ComboBox Classes="header-filter"
+                                      ItemsSource="{Binding AvailableIssueAssigneeFilters}"
+                                      Margin="0,0,8,8"
+                                      SelectedItem="{Binding SelectedIssueAssigneeFilter}" />
+                            <ComboBox Classes="header-filter"
+                                      ItemsSource="{Binding AvailableIssueLabelFilters}"
+                                      Margin="0,0,8,8"
+                                      SelectedItem="{Binding SelectedIssueLabelFilter}" />
+                            <ComboBox Classes="header-filter"
+                                      ItemsSource="{Binding AvailableIssueProjectFilters}"
+                                      Margin="0,0,8,8"
+                                      SelectedItem="{Binding SelectedIssueProjectFilter}" />
+                            <ComboBox Classes="header-filter"
+                                      ItemsSource="{Binding AvailableIssueMilestoneFilters}"
+                                      Margin="0,0,8,8"
+                                      SelectedItem="{Binding SelectedIssueMilestoneFilter}" />
+                            <ComboBox Classes="header-filter"
+                                      ItemsSource="{Binding AvailableIssueTypeFilters}"
+                                      Margin="0,0,8,8"
+                                      SelectedItem="{Binding SelectedIssueTypeFilter}" />
+                            <ComboBox Classes="header-filter"
+                                      ItemsSource="{Binding AvailableIssueSortOptions}"
+                                      Margin="0,0,8,8"
+                                      SelectedItem="{Binding SelectedIssueSortOption}" />
+                        </WrapPanel>
+                    </Border>
+
+                    <Border Grid.Row="1"
+                            BorderBrush="{StaticResource TrackyBorderBrush}"
+                            BorderThickness="0,1,0,1"
+                            Padding="14,8">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <TextBlock Classes="muted"
+                                       Text="{Binding IssueListSummaryText}"
+                                       TextWrapping="Wrap" />
+                            <TextBlock Grid.Column="1"
+                                       Classes="muted"
+                                       Text="{Binding UpcomingIssues, StringFormat='Upcoming {0}'}" />
+                        </Grid>
+                    </Border>
 
                     <ListBox x:Name="IssueListBox"
-                             Grid.Row="1"
+                             Grid.Row="2"
                              ItemsSource="{Binding VisibleIssues}"
                              SelectedItem="{Binding SelectedIssue, Mode=TwoWay}"
                              Background="Transparent"
                              BorderThickness="0">
                         <ListBox.ItemTemplate>
                             <DataTemplate x:DataType="vm:IssueCardViewModel">
-                                <Border Background="{StaticResource TrackySurfaceStrongBrush}"
-                                        BorderBrush="{Binding CardBorderBrush}"
-                                        BorderThickness="1"
-                                        CornerRadius="10"
-                                        Padding="18">
-                                    <StackPanel Spacing="14">
-                                        <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="10">
-                                            <StackPanel>
-                                                <TextBlock Text="{Binding Title}"
-                                                           FontSize="18"
-                                                           FontWeight="SemiBold"
-                                                           Foreground="{StaticResource TrackyInkBrush}" />
-                                                <TextBlock Classes="mono" Text="{Binding NumberText}" />
-                                            </StackPanel>
+                                <Border Classes="issue-row"
+                                        BorderBrush="{Binding CardBorderBrush}">
+                                    <Grid ColumnDefinitions="28,*,Auto" ColumnSpacing="12">
+                                        <Border Width="20"
+                                                Height="20"
+                                                CornerRadius="10"
+                                                Background="{Binding StateIconBackground}"
+                                                VerticalAlignment="Top">
+                                            <TextBlock HorizontalAlignment="Center"
+                                                       VerticalAlignment="Center"
+                                                       FontSize="12"
+                                                       FontWeight="Bold"
+                                                       Foreground="{Binding StateIconForeground}"
+                                                       Text="{Binding StateIconText}" />
+                                        </Border>
 
-                                            <Border Grid.Column="1"
-                                                    Background="{Binding PriorityBadgeBackground}"
-                                                    CornerRadius="999"
-                                                    Padding="10,5"
-                                                    VerticalAlignment="Top">
-                                                <TextBlock Text="{Binding PriorityText}"
-                                                           Foreground="{Binding PriorityBadgeForeground}"
-                                                           FontWeight="SemiBold" />
-                                            </Border>
+                                        <StackPanel Grid.Column="1" Spacing="6">
+                                            <WrapPanel>
+                                                <TextBlock Classes="issue-title"
+                                                           Margin="0,0,8,4"
+                                                           Text="{Binding Title}"
+                                                           TextWrapping="Wrap" />
+                                                <Border Background="{Binding PriorityBadgeBackground}"
+                                                        CornerRadius="999"
+                                                        Margin="0,0,6,4"
+                                                        Padding="8,2">
+                                                    <TextBlock FontSize="12"
+                                                               FontWeight="SemiBold"
+                                                               Foreground="{Binding PriorityBadgeForeground}"
+                                                               Text="{Binding PriorityText}" />
+                                                </Border>
+                                                <ItemsControl ItemsSource="{Binding Labels}"
+                                                              IsVisible="{Binding HasLabels}">
+                                                    <ItemsControl.ItemsPanel>
+                                                        <ItemsPanelTemplate>
+                                                            <WrapPanel />
+                                                        </ItemsPanelTemplate>
+                                                    </ItemsControl.ItemsPanel>
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate>
+                                                            <Border Background="{StaticResource TrackyAccentSoftBrush}"
+                                                                    BorderBrush="{StaticResource TrackyAccentBrush}"
+                                                                    BorderThickness="1"
+                                                                    CornerRadius="999"
+                                                                    Margin="0,0,6,4"
+                                                                    Padding="8,2">
+                                                                <TextBlock FontSize="12"
+                                                                           Text="{Binding .}"
+                                                                           Foreground="{StaticResource TrackyAccentBrush}" />
+                                                            </Border>
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+                                            </WrapPanel>
 
-                                            <Border Grid.Column="2"
-                                                    Background="{Binding StateBadgeBackground}"
-                                                    CornerRadius="999"
-                                                    Padding="10,5"
-                                                    VerticalAlignment="Top">
-                                                <TextBlock Text="{Binding StateText}"
-                                                           Foreground="{Binding StateBadgeForeground}"
-                                                           FontWeight="SemiBold" />
-                                            </Border>
-                                        </Grid>
-
-                                        <ItemsControl ItemsSource="{Binding Labels}"
-                                                      IsVisible="{Binding HasLabels}">
-                                            <ItemsControl.ItemsPanel>
-                                                <ItemsPanelTemplate>
-                                                    <WrapPanel />
-                                                </ItemsPanelTemplate>
-                                            </ItemsControl.ItemsPanel>
-                                            <ItemsControl.ItemTemplate>
-                                                <DataTemplate>
-                                                    <Border Background="#F3F4F6"
-                                                            CornerRadius="999"
-                                                            Margin="0,0,8,8"
-                                                            Padding="10,4">
-                                                        <TextBlock Text="{Binding .}"
-                                                                   Foreground="{StaticResource TrackyMutedInkBrush}" />
-                                                    </Border>
-                                                </DataTemplate>
-                                            </ItemsControl.ItemTemplate>
-                                        </ItemsControl>
-
-                                        <WrapPanel>
-                                            <TextBlock Classes="muted" Margin="0,0,16,0" Text="{Binding StateDetailText}" />
-                                            <TextBlock Classes="muted" Margin="0,0,16,0" Text="{Binding AssigneeText}" />
-                                            <TextBlock Classes="muted" Margin="0,0,16,0" Text="{Binding ProjectText}" />
-                                            <TextBlock Classes="muted" Margin="0,0,16,0" Text="{Binding MilestoneText}" />
-                                            <TextBlock Classes="muted" Margin="0,0,16,0" Text="{Binding IssueTypeText}" />
                                             <TextBlock Classes="muted"
-                                                       Margin="0,0,16,0"
+                                                       Text="{Binding GitHubListMetaText}" />
+                                            <WrapPanel>
+                                                <TextBlock Classes="muted"
+                                                           Margin="0,0,12,0"
+                                                           Text="{Binding GitHubListSecondaryText}" />
+                                                <Border Background="{Binding DueBadgeBackground}"
+                                                        CornerRadius="999"
+                                                        Padding="8,2"
+                                                        IsVisible="{Binding HasDueDate}">
+                                                    <TextBlock FontSize="12"
+                                                               FontWeight="SemiBold"
+                                                               Foreground="{Binding DueBadgeForeground}"
+                                                               Text="{Binding DueText}" />
+                                                </Border>
+                                            </WrapPanel>
+                                        </StackPanel>
+
+                                        <StackPanel Grid.Column="2"
+                                                    Orientation="Horizontal"
+                                                    Spacing="12"
+                                                    VerticalAlignment="Top">
+                                            <TextBlock Classes="muted"
                                                        IsVisible="{Binding HasComments}"
-                                                       Text="{Binding CommentsText}" />
+                                                       Text="{Binding CommentBadgeText, StringFormat='Comments {0}'}" />
                                             <TextBlock Classes="muted"
-                                                       Margin="0,0,16,0"
                                                        IsVisible="{Binding HasAttachments}"
                                                        Text="{Binding AttachmentsText}" />
-                                            <TextBlock Classes="muted" Text="{Binding UpdatedText}" />
-                                        </WrapPanel>
-
-                                        <Border Background="{Binding DueBadgeBackground}"
-                                                CornerRadius="8"
-                                                Padding="12,8"
-                                                HorizontalAlignment="Left"
-                                                IsVisible="{Binding HasDueDate}">
-                                            <TextBlock Text="{Binding DueText}"
-                                                       Foreground="{Binding DueBadgeForeground}"
-                                                       FontWeight="SemiBold" />
-                                        </Border>
-                                    </StackPanel>
+                                        </StackPanel>
+                                    </Grid>
                                 </Border>
                             </DataTemplate>
                         </ListBox.ItemTemplate>
@@ -393,10 +545,612 @@
                 </Grid>
             </Border>
 
-            <TextBlock Grid.Row="3"
-                       Classes="muted"
-                       Text="{Binding StatusMessage}"
-                       TextWrapping="Wrap" />
+            <Grid Grid.Row="3"
+                  ColumnDefinitions="1.15*,0.85*"
+                  ColumnSpacing="14">
+                <Border Classes="surface"
+                        Padding="18"
+                        IsVisible="{Binding IsQuickCaptureVisible}">
+                    <StackPanel Spacing="12">
+                        <!-- GitHub의 New issue 작성 흐름처럼 목록 화면 아래에서 제목, 본문, 메타데이터를 한 번에 입력한다. -->
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                            <TextBlock Classes="section-title" Text="New issue" />
+                            <ComboBox Grid.Column="1"
+                                      ItemsSource="{Binding AvailableIssueContentFormats}"
+                                      SelectedItem="{Binding DraftIssueContentFormat}" />
+                        </Grid>
+                        <TextBox x:Name="QuickCaptureTitleBox"
+                                 PlaceholderText="Title"
+                                 Text="{Binding DraftTitle, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBox x:Name="QuickCaptureDescriptionBox"
+                                 AcceptsReturn="True"
+                                 MinHeight="118"
+                                 TextWrapping="Wrap"
+                                 VerticalContentAlignment="Top"
+                                 PlaceholderText="Write the issue body in Markdown or HTML."
+                                 Text="{Binding DraftDescription}" />
+                        <Grid ColumnDefinitions="*,*,*,*" ColumnSpacing="10">
+                            <TextBox PlaceholderText="Assignee"
+                                     Text="{Binding DraftAssignee}" />
+                            <ComboBox Grid.Column="1"
+                                      ItemsSource="{Binding AvailablePriorities}"
+                                      SelectedItem="{Binding DraftPriority}" />
+                            <TextBox Grid.Column="2"
+                                     PlaceholderText="Project"
+                                     Text="{Binding DraftProjectName}" />
+                            <DatePicker Grid.Column="3"
+                                        SelectedDate="{Binding DraftDueDate}" />
+                        </Grid>
+                        <Grid ColumnDefinitions="*,*,*" ColumnSpacing="10">
+                            <TextBox PlaceholderText="Milestone"
+                                     Text="{Binding DraftMilestoneName}" />
+                            <TextBox Grid.Column="1"
+                                     PlaceholderText="Issue type"
+                                     Text="{Binding DraftIssueTypeName}" />
+                            <TextBox Grid.Column="2"
+                                     PlaceholderText="Labels"
+                                     Text="{Binding DraftLabels}" />
+                        </Grid>
+                        <Button x:Name="CreateIssueButton"
+                                Classes="primary"
+                                HorizontalAlignment="Right"
+                                Command="{Binding CreateIssueCommand}"
+                                Content="Submit new issue" />
+                    </StackPanel>
+                </Border>
+
+                <Border Grid.Column="1"
+                        Classes="surface"
+                        Padding="18">
+                    <StackPanel Spacing="12">
+                        <TextBlock Classes="section-title" Text="Issue tools" />
+                        <TextBlock x:Name="DetailStatusMessageText"
+                                   Classes="muted"
+                                   Text="{Binding DetailStatusMessage}"
+                                   TextWrapping="Wrap" />
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                            <TextBox PlaceholderText="Saved search name"
+                                     Text="{Binding DraftSavedIssueSearchName, UpdateSourceTrigger=PropertyChanged}" />
+                            <Button x:Name="SaveIssueSearchButton"
+                                    Grid.Column="1"
+                                    Classes="secondary"
+                                    Command="{Binding SaveIssueSearchCommand}"
+                                    Content="Save search" />
+                        </Grid>
+                        <ItemsControl ItemsSource="{Binding SavedIssueSearches}"
+                                      IsVisible="{Binding HasSavedIssueSearches}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:SavedIssueSearchViewModel">
+                                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8" Margin="0,0,0,8">
+                                        <TextBlock Classes="muted"
+                                                   Text="{Binding QueryText}"
+                                                   TextWrapping="Wrap" />
+                                        <Button Grid.Column="1"
+                                                Classes="secondary"
+                                                Command="{Binding #RootWindow.((vm:MainWindowViewModel)DataContext).ApplySavedIssueSearchCommand}"
+                                                CommandParameter="{Binding}"
+                                                Content="Apply" />
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
+                            <ComboBox ItemsSource="{Binding AvailableExportFormats}"
+                                      SelectedItem="{Binding DraftExportFormat}" />
+                            <ComboBox Grid.Column="1"
+                                      ItemsSource="{Binding AvailableExportBodyFormats}"
+                                      SelectedItem="{Binding DraftExportBodyFormat}" />
+                        </Grid>
+                        <Grid ColumnDefinitions="Auto,Auto,Auto,*" ColumnSpacing="10">
+                            <CheckBox Content="Comments"
+                                      IsChecked="{Binding DraftExportIncludeComments}" />
+                            <CheckBox Grid.Column="1"
+                                      Content="Activity"
+                                      IsChecked="{Binding DraftExportIncludeActivity}" />
+                            <CheckBox Grid.Column="2"
+                                      Content="Attachments"
+                                      IsChecked="{Binding DraftExportIncludeAttachments}" />
+                            <Button x:Name="ExportSelectionButton"
+                                    Grid.Column="3"
+                                    Classes="secondary"
+                                    HorizontalAlignment="Right"
+                                    Command="{Binding ExportSelectionCommand}"
+                                    Content="Export" />
+                        </Grid>
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                            <TextBox PlaceholderText="Export preset name"
+                                     Text="{Binding ExportPresetName, UpdateSourceTrigger=PropertyChanged}" />
+                            <Button x:Name="SaveExportPresetButton"
+                                    Grid.Column="1"
+                                    Classes="secondary"
+                                    Command="{Binding SaveExportPresetCommand}"
+                                    Content="Save preset" />
+                        </Grid>
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                            <ComboBox ItemsSource="{Binding AvailableThemePreferences}"
+                                      SelectedItem="{Binding SelectedThemePreference}" />
+                            <Button x:Name="SavePreferencesButton"
+                                    Grid.Column="1"
+                                    Classes="secondary"
+                                    Command="{Binding SavePreferencesCommand}"
+                                    Content="Save preferences" />
+                        </Grid>
+                    </StackPanel>
+                </Border>
+            </Grid>
+        </Grid>
+
+        <Grid Grid.Column="1"
+              RowDefinitions="Auto,*"
+              RowSpacing="16"
+              IsVisible="{Binding IsIssueDetailViewActive}">
+            <Border BorderBrush="{StaticResource TrackyBorderBrush}"
+                    BorderThickness="0,0,0,1"
+                    Padding="0,0,0,12">
+                <Grid RowDefinitions="Auto,Auto" RowSpacing="12">
+                    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+                        <Button x:Name="BackToIssueListButton"
+                                Classes="secondary"
+                                Command="{Binding BackToIssueListCommand}"
+                                Content="Back to issues" />
+                        <StackPanel Grid.Column="1" Spacing="4">
+                            <TextBlock Classes="mono"
+                                       Text="{Binding DetailStatusMessage}"
+                                       TextWrapping="Wrap" />
+                            <TextBlock Classes="muted"
+                                       Text="Issue detail"
+                                       TextWrapping="Wrap" />
+                        </StackPanel>
+                        <Button Grid.Column="2"
+                                Classes="primary"
+                                Command="{Binding PrepareNewIssueCommand}"
+                                Content="New issue" />
+                    </Grid>
+
+                    <ContentControl x:Name="SelectedIssueDetailContent"
+                                    Grid.Row="1"
+                                    Content="{Binding SelectedIssueDetail}">
+                        <ContentControl.ContentTemplate>
+                            <DataTemplate x:DataType="vm:IssueDetailViewModel">
+                                <StackPanel Spacing="8">
+                                    <WrapPanel>
+                                        <Border Background="{Binding Summary.StateBadgeBackground}"
+                                                CornerRadius="999"
+                                                Margin="0,0,8,4"
+                                                Padding="10,5">
+                                            <TextBlock Text="{Binding Summary.StateText}"
+                                                       Foreground="{Binding Summary.StateBadgeForeground}"
+                                                       FontWeight="SemiBold" />
+                                        </Border>
+                                        <TextBlock Classes="mono"
+                                                   Margin="0,5,8,0"
+                                                   Text="{Binding Summary.NumberText}" />
+                                        <TextBlock Classes="muted"
+                                                   Margin="0,5,0,0"
+                                                   Text="{Binding Summary.UpdatedText}" />
+                                    </WrapPanel>
+                                    <TextBlock Classes="hero-title"
+                                               Text="{Binding Summary.Title}"
+                                               TextWrapping="Wrap" />
+                                </StackPanel>
+                            </DataTemplate>
+                        </ContentControl.ContentTemplate>
+                    </ContentControl>
+                </Grid>
+            </Border>
+
+            <Grid Grid.Row="1"
+                  ColumnDefinitions="*,300"
+                  ColumnSpacing="14">
+                <ScrollViewer>
+                <ContentControl Content="{Binding SelectedIssueDetail}">
+                    <ContentControl.ContentTemplate>
+                        <DataTemplate x:DataType="vm:IssueDetailViewModel">
+                            <StackPanel Spacing="14">
+                                <Border Classes="surface" Padding="18">
+                                    <StackPanel Spacing="12">
+                                        <!-- GitHub Issue 상세처럼 본문, 언어 배지, 댓글 흐름을 상세 페이지 안에서 바로 읽고 수정하게 한다. -->
+                                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="14">
+                                            <StackPanel Spacing="8">
+                                                <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="10">
+                                                    <TextBlock Classes="section-title" Text="Description" />
+                                                    <Border Grid.Column="1"
+                                                            Background="{StaticResource TrackyAccentSoftBrush}"
+                                                            BorderBrush="{StaticResource TrackyAccentBrush}"
+                                                            BorderThickness="1"
+                                                            CornerRadius="999"
+                                                            Padding="9,3">
+                                                        <TextBlock Text="{Binding DescriptionFormatText}"
+                                                                   Foreground="{StaticResource TrackyAccentBrush}"
+                                                                   FontSize="12"
+                                                                   FontWeight="SemiBold" />
+                                                    </Border>
+                                                    <Button x:Name="DescriptionEditButton"
+                                                            Grid.Column="2"
+                                                            Classes="secondary"
+                                                            Command="{Binding #RootWindow.((vm:MainWindowViewModel)DataContext).StartDescriptionEditCommand}"
+                                                            Content="Edit"
+                                                            IsVisible="{Binding #RootWindow.((vm:MainWindowViewModel)DataContext).IsDescriptionReadMode}" />
+                                                    <StackPanel Grid.Column="2"
+                                                                Orientation="Horizontal"
+                                                                Spacing="8"
+                                                                IsVisible="{Binding #RootWindow.((vm:MainWindowViewModel)DataContext).IsDescriptionEditMode}">
+                                                        <Button Classes="primary"
+                                                                Command="{Binding #RootWindow.((vm:MainWindowViewModel)DataContext).UpdateSelectedIssueCommand}"
+                                                                Content="Save" />
+                                                        <Button Classes="secondary"
+                                                                Command="{Binding #RootWindow.((vm:MainWindowViewModel)DataContext).CancelDescriptionEditCommand}"
+                                                                Content="Cancel" />
+                                                    </StackPanel>
+                                                </Grid>
+                                                <!-- 로컬 앱에서는 WebView가 원문 HTML/CSS를 직접 그려 GitHub issue body에 가까운 읽기 경험을 만든다. -->
+                                                <controls:IssueHtmlPreview HtmlContent="{Binding DescriptionHtmlDocument}"
+                                                                           FallbackText="{Binding DescriptionFallbackText}"
+                                                                           PreviewHeight="{Binding DescriptionPreviewHeight}"
+                                                                           IsVisible="{Binding #RootWindow.((vm:MainWindowViewModel)DataContext).IsDescriptionReadMode}" />
+                                                <Grid RowDefinitions="Auto,Auto"
+                                                      RowSpacing="8"
+                                                      IsVisible="{Binding #RootWindow.((vm:MainWindowViewModel)DataContext).IsDescriptionEditMode}">
+                                                    <!-- 본문 원문 편집은 메타데이터 사이드바가 아니라 body card 안에서 처리해 읽기와 수정의 문맥을 붙인다. -->
+                                                    <ComboBox Width="160"
+                                                              HorizontalAlignment="Left"
+                                                              ItemsSource="{Binding #RootWindow.((vm:MainWindowViewModel)DataContext).AvailableIssueContentFormats}"
+                                                              SelectedItem="{Binding #RootWindow.((vm:MainWindowViewModel)DataContext).EditDescriptionFormat}" />
+                                                    <TextBox x:Name="DescriptionEditSourceBox"
+                                                             Grid.Row="1"
+                                                             AcceptsReturn="True"
+                                                             MinHeight="170"
+                                                             TextWrapping="Wrap"
+                                                             VerticalContentAlignment="Top"
+                                                             PlaceholderText="Edit the issue body source in Markdown or HTML."
+                                                             Text="{Binding #RootWindow.((vm:MainWindowViewModel)DataContext).EditDescription}" />
+                                                </Grid>
+                                            </StackPanel>
+                                            <WrapPanel Grid.Column="1">
+                                                <Border Background="{Binding Summary.PriorityBadgeBackground}"
+                                                        CornerRadius="999"
+                                                        Margin="0,0,8,8"
+                                                        Padding="10,5">
+                                                    <TextBlock Text="{Binding Summary.PriorityText}"
+                                                               Foreground="{Binding Summary.PriorityBadgeForeground}"
+                                                               FontWeight="SemiBold" />
+                                                </Border>
+                                                <Border Background="{Binding Summary.DueBadgeBackground}"
+                                                        CornerRadius="999"
+                                                        Margin="0,0,0,8"
+                                                        Padding="10,5"
+                                                        IsVisible="{Binding Summary.HasDueDate}">
+                                                    <TextBlock Text="{Binding Summary.DueText}"
+                                                               Foreground="{Binding Summary.DueBadgeForeground}"
+                                                               FontWeight="SemiBold" />
+                                                </Border>
+                                            </WrapPanel>
+                                        </Grid>
+
+                                        <ItemsControl ItemsSource="{Binding Summary.Labels}"
+                                                      IsVisible="{Binding Summary.HasLabels}">
+                                            <ItemsControl.ItemsPanel>
+                                                <ItemsPanelTemplate>
+                                                    <WrapPanel />
+                                                </ItemsPanelTemplate>
+                                            </ItemsControl.ItemsPanel>
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Border Background="{StaticResource TrackyAccentSoftBrush}"
+                                                            BorderBrush="{StaticResource TrackyAccentBrush}"
+                                                            BorderThickness="1"
+                                                            CornerRadius="999"
+                                                            Margin="0,0,8,6"
+                                                            Padding="9,3">
+                                                        <TextBlock Text="{Binding .}"
+                                                                   Foreground="{StaticResource TrackyAccentBrush}" />
+                                                    </Border>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </StackPanel>
+                                </Border>
+
+                                <Border Classes="surface" Padding="18">
+                                    <StackPanel Spacing="12">
+                                        <Grid ColumnDefinitions="*,160" ColumnSpacing="10">
+                                            <TextBlock Classes="section-title" Text="Comment" />
+                                            <ComboBox Grid.Column="1"
+                                                      ItemsSource="{Binding #RootWindow.((vm:MainWindowViewModel)DataContext).AvailableIssueContentFormats}"
+                                                      SelectedItem="{Binding #RootWindow.((vm:MainWindowViewModel)DataContext).DraftCommentFormat}" />
+                                        </Grid>
+                                        <StackPanel Orientation="Horizontal" Spacing="2">
+                                            <!-- Write/Preview 탭은 저장 전 댓글도 실제 렌더링 경로로 확인하게 만드는 GitHub식 작성 흐름이다. -->
+                                            <Button x:Name="CommentWriteTabButton"
+                                                    Classes="github-tab"
+                                                    Classes.active="{Binding #RootWindow.((vm:MainWindowViewModel)DataContext).IsCommentWriteMode}"
+                                                    Command="{Binding #RootWindow.((vm:MainWindowViewModel)DataContext).ShowCommentWriteCommand}"
+                                                    Content="Write" />
+                                            <Button x:Name="CommentPreviewTabButton"
+                                                    Classes="github-tab"
+                                                    Classes.active="{Binding #RootWindow.((vm:MainWindowViewModel)DataContext).IsCommentPreviewMode}"
+                                                    Command="{Binding #RootWindow.((vm:MainWindowViewModel)DataContext).ShowCommentPreviewCommand}"
+                                                    Content="Preview" />
+                                        </StackPanel>
+                                        <Grid ColumnDefinitions="160,*"
+                                              ColumnSpacing="10"
+                                              IsVisible="{Binding #RootWindow.((vm:MainWindowViewModel)DataContext).IsCommentWriteMode}">
+                                            <TextBox PlaceholderText="Author"
+                                                     Text="{Binding #RootWindow.((vm:MainWindowViewModel)DataContext).DraftCommentAuthor}" />
+                                            <TextBox x:Name="DetailPageCommentBodyBox"
+                                                     Grid.Column="1"
+                                                     AcceptsReturn="True"
+                                                     MinHeight="92"
+                                                     TextWrapping="Wrap"
+                                                     VerticalContentAlignment="Top"
+                                                     PlaceholderText="Write a comment in Markdown or HTML."
+                                                     Text="{Binding #RootWindow.((vm:MainWindowViewModel)DataContext).DraftCommentBody}" />
+                                        </Grid>
+                                        <ContentControl x:Name="CommentPreviewContent"
+                                                        IsVisible="{Binding #RootWindow.((vm:MainWindowViewModel)DataContext).IsCommentPreviewMode}">
+                                            <controls:IssueHtmlPreview HtmlContent="{Binding #RootWindow.((vm:MainWindowViewModel)DataContext).DraftCommentPreviewHtmlDocument}"
+                                                                       FallbackText="{Binding #RootWindow.((vm:MainWindowViewModel)DataContext).DraftCommentPreviewFallbackText}"
+                                                                       PreviewHeight="{Binding #RootWindow.((vm:MainWindowViewModel)DataContext).DraftCommentPreviewHeight}" />
+                                        </ContentControl>
+                                        <Grid ColumnDefinitions="Auto,Auto,Auto,*" ColumnSpacing="10">
+                                            <Button x:Name="DetailPageAddCommentButton"
+                                                    Classes="primary"
+                                                    Command="{Binding #RootWindow.((vm:MainWindowViewModel)DataContext).AddCommentCommand}"
+                                                    Content="Comment" />
+                                            <Button x:Name="DetailPageAttachFileButton"
+                                                    Grid.Column="1"
+                                                    Classes="secondary"
+                                                    Command="{Binding #RootWindow.((vm:MainWindowViewModel)DataContext).AttachFileCommand}"
+                                                    Content="Attach file" />
+                                            <ComboBox x:Name="ComposerCloseReasonComboBox"
+                                                      Grid.Column="2"
+                                                      Width="156"
+                                                      ItemsSource="{Binding #RootWindow.((vm:MainWindowViewModel)DataContext).AvailableCloseReasons}"
+                                                      SelectedItem="{Binding #RootWindow.((vm:MainWindowViewModel)DataContext).SelectedCloseReason}"
+                                                      IsVisible="{Binding #RootWindow.((vm:MainWindowViewModel)DataContext).CanChooseCloseReason}" />
+                                            <Button Grid.Column="3"
+                                                    Classes="secondary"
+                                                    HorizontalAlignment="Right"
+                                                    Command="{Binding #RootWindow.((vm:MainWindowViewModel)DataContext).ToggleSelectedIssueStateCommand}"
+                                                    Content="{Binding Summary.ActionLabel}" />
+                                        </Grid>
+                                    </StackPanel>
+                                </Border>
+
+                                <Grid ColumnDefinitions="*,*" ColumnSpacing="14">
+                                    <Border Classes="surface" Padding="18">
+                                        <StackPanel Spacing="12">
+                                            <TextBlock Classes="section-title" Text="Comments" />
+                                            <TextBlock Classes="muted"
+                                                       Text="{Binding CommentCountText}" />
+                                            <TextBlock Classes="muted"
+                                                       IsVisible="{Binding HasNoComments}"
+                                                       Text="No comment has been written for this issue yet." />
+                                            <ItemsControl ItemsSource="{Binding Comments}"
+                                                          IsVisible="{Binding HasComments}">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate x:DataType="vm:IssueCommentViewModel">
+                                                        <Border Background="{StaticResource TrackySurfaceStrongBrush}"
+                                                                BorderBrush="{StaticResource TrackyBorderBrush}"
+                                                                BorderThickness="1"
+                                                                CornerRadius="6"
+                                                                Margin="0,0,0,10"
+                                                                Padding="14">
+                                                            <StackPanel Spacing="8">
+                                                                <WrapPanel>
+                                                                    <TextBlock Text="{Binding AuthorDisplayName}"
+                                                                               FontWeight="SemiBold"
+                                                                               Foreground="{StaticResource TrackyInkBrush}" />
+                                                                    <TextBlock Classes="muted"
+                                                                               Margin="10,0,0,0"
+                                                                               Text="{Binding CreatedText}" />
+                                                                    <Border Background="{StaticResource TrackyAccentSoftBrush}"
+                                                                            BorderBrush="{StaticResource TrackyAccentBrush}"
+                                                                            BorderThickness="1"
+                                                                            CornerRadius="999"
+                                                                            Margin="10,0,0,0"
+                                                                            Padding="7,2">
+                                                                        <TextBlock Text="{Binding BodyFormatText}"
+                                                                                   Foreground="{StaticResource TrackyAccentBrush}"
+                                                                                   FontSize="12"
+                                                                                   FontWeight="SemiBold" />
+                                                                    </Border>
+                                                                </WrapPanel>
+                                                                <!-- 댓글 역시 같은 렌더링 경로를 타야 Markdown/HTML 포맷 간 표현 차이가 작아진다. -->
+                                                                <controls:IssueHtmlPreview HtmlContent="{Binding BodyHtmlDocument}"
+                                                                                           FallbackText="{Binding BodyFallbackText}"
+                                                                                           PreviewHeight="{Binding BodyPreviewHeight}" />
+                                                            </StackPanel>
+                                                        </Border>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </StackPanel>
+                                    </Border>
+
+                                    <Border Grid.Column="1"
+                                            Classes="surface"
+                                            Padding="18">
+                                        <StackPanel Spacing="12">
+                                            <TextBlock Classes="section-title" Text="Timeline" />
+                                            <TextBlock Classes="muted"
+                                                       Text="Creation, comments, state changes, attachments, and reminders are recorded here." />
+                                            <TextBlock Classes="muted"
+                                                       IsVisible="{Binding HasNoActivity}"
+                                                       Text="No activity has been recorded for this issue yet." />
+                                            <ItemsControl ItemsSource="{Binding Activity}"
+                                                          IsVisible="{Binding HasActivity}">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate x:DataType="vm:IssueActivityViewModel">
+                                                        <Border Background="{StaticResource TrackySurfaceStrongBrush}"
+                                                                BorderBrush="{StaticResource TrackyBorderBrush}"
+                                                                BorderThickness="1"
+                                                                CornerRadius="6"
+                                                                Margin="0,0,0,10"
+                                                                Padding="14">
+                                                            <StackPanel Spacing="6">
+                                                                <WrapPanel>
+                                                                    <Border Background="{StaticResource TrackyAccentSoftBrush}"
+                                                                            CornerRadius="999"
+                                                                            Padding="8,3">
+                                                                        <TextBlock Text="{Binding EventLabel}"
+                                                                                   Foreground="{StaticResource TrackyAccentBrush}"
+                                                                                   FontWeight="SemiBold" />
+                                                                    </Border>
+                                                                    <TextBlock Classes="muted"
+                                                                               Margin="10,4,0,0"
+                                                                               Text="{Binding CreatedText}" />
+                                                                </WrapPanel>
+                                                                <TextBlock Classes="body"
+                                                                           Text="{Binding Summary}"
+                                                                           TextWrapping="Wrap" />
+                                                            </StackPanel>
+                                                        </Border>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </StackPanel>
+                                    </Border>
+                                </Grid>
+
+                                <Grid ColumnDefinitions="*,*" ColumnSpacing="14">
+                                    <Border Classes="surface" Padding="18">
+                                        <StackPanel Spacing="12">
+                                            <TextBlock Classes="section-title" Text="Relations" />
+                                            <TextBlock Classes="muted"
+                                                       Text="{Binding RelationCountText}" />
+                                            <TextBlock Classes="muted"
+                                                       IsVisible="{Binding HasNoRelations}"
+                                                       Text="No relation has been linked for this issue." />
+                                            <ItemsControl ItemsSource="{Binding Relations}"
+                                                          IsVisible="{Binding HasRelations}">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate x:DataType="vm:IssueRelationViewModel">
+                                                        <TextBlock Classes="body"
+                                                                   Margin="0,0,0,8"
+                                                                   Text="{Binding TargetText}"
+                                                                   TextWrapping="Wrap" />
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </StackPanel>
+                                    </Border>
+
+                                    <Border Grid.Column="1"
+                                            Classes="surface"
+                                            Padding="18">
+                                        <StackPanel Spacing="12">
+                                            <TextBlock Classes="section-title" Text="Attachments and reminders" />
+                                            <TextBlock Classes="muted"
+                                                       Text="{Binding AttachmentCountText}" />
+                                            <TextBlock Classes="muted"
+                                                       Text="{Binding ReminderCountText}" />
+                                            <ItemsControl ItemsSource="{Binding Attachments}"
+                                                          IsVisible="{Binding HasAttachments}">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate x:DataType="vm:IssueAttachmentViewModel">
+                                                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10" Margin="0,0,0,8">
+                                                            <TextBlock Classes="body"
+                                                                       Text="{Binding FileName}"
+                                                                       TextWrapping="Wrap" />
+                                                            <Button Grid.Column="1"
+                                                                    Classes="secondary"
+                                                                    Command="{Binding #RootWindow.((vm:MainWindowViewModel)DataContext).OpenAttachmentCommand}"
+                                                                    CommandParameter="{Binding}"
+                                                                    Content="Open" />
+                                                        </Grid>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </StackPanel>
+                                    </Border>
+                                </Grid>
+                            </StackPanel>
+                        </DataTemplate>
+                    </ContentControl.ContentTemplate>
+                </ContentControl>
+            </ScrollViewer>
+
+                <ScrollViewer Grid.Column="1">
+                    <Border Classes="surface"
+                            Padding="16"
+                            IsVisible="{Binding IsIssueEditorVisible}">
+                        <StackPanel Spacing="14">
+                            <!-- GitHub의 개별 이슈 화면처럼 메타데이터는 상세 화면 안의 보조 컬럼에서 편집한다. -->
+                            <TextBlock Classes="section-title" Text="Issue metadata" />
+
+                            <StackPanel x:Name="MetadataTitleSection" Spacing="6">
+                                <TextBlock Classes="muted" Text="Title" />
+                                <TextBox x:Name="IssueEditTitleBox"
+                                         PlaceholderText="Issue title"
+                                         Text="{Binding EditTitle, UpdateSourceTrigger=PropertyChanged}" />
+                            </StackPanel>
+
+                            <Border Height="1" Background="{StaticResource TrackyBorderBrush}" />
+
+                            <StackPanel x:Name="MetadataAssigneesSection" Spacing="6">
+                                <TextBlock Classes="muted" Text="Assignees" />
+                                <TextBox PlaceholderText="Assignee"
+                                         Text="{Binding EditAssignee}" />
+                            </StackPanel>
+
+                            <Border Height="1" Background="{StaticResource TrackyBorderBrush}" />
+
+                            <StackPanel x:Name="MetadataLabelsSection" Spacing="6">
+                                <TextBlock Classes="muted" Text="Labels" />
+                                <TextBox PlaceholderText="Labels"
+                                         Text="{Binding EditLabels}" />
+                            </StackPanel>
+
+                            <Border Height="1" Background="{StaticResource TrackyBorderBrush}" />
+
+                            <StackPanel x:Name="MetadataProjectsSection" Spacing="6">
+                                <TextBlock Classes="muted" Text="Projects" />
+                                <TextBox PlaceholderText="Project"
+                                         Text="{Binding EditProjectName}" />
+                            </StackPanel>
+
+                            <Border Height="1" Background="{StaticResource TrackyBorderBrush}" />
+
+                            <StackPanel x:Name="MetadataMilestoneSection" Spacing="6">
+                                <TextBlock Classes="muted" Text="Milestone" />
+                                <TextBox PlaceholderText="Milestone"
+                                         Text="{Binding EditMilestoneName}" />
+                            </StackPanel>
+
+                            <Border Height="1" Background="{StaticResource TrackyBorderBrush}" />
+
+                            <StackPanel x:Name="MetadataTypeSection" Spacing="6">
+                                <TextBlock Classes="muted" Text="Type" />
+                                <TextBox PlaceholderText="Issue type"
+                                         Text="{Binding EditIssueTypeName}" />
+                            </StackPanel>
+
+                            <Border Height="1" Background="{StaticResource TrackyBorderBrush}" />
+
+                            <StackPanel x:Name="MetadataPrioritySection" Spacing="6">
+                                <TextBlock Classes="muted" Text="Priority" />
+                                <ComboBox ItemsSource="{Binding AvailablePriorities}"
+                                          SelectedItem="{Binding EditPriority}" />
+                            </StackPanel>
+
+                            <StackPanel x:Name="MetadataDueDateSection" Spacing="6">
+                                <TextBlock Classes="muted" Text="Due date" />
+                                <DatePicker SelectedDate="{Binding EditDueDate}" />
+                            </StackPanel>
+
+                            <Button x:Name="UpdateIssueButton"
+                                    Classes="primary"
+                                    Command="{Binding UpdateSelectedIssueCommand}"
+                                    Content="Save metadata" />
+                            <Button x:Name="DeleteIssueButton"
+                                    Classes="secondary"
+                                    Command="{Binding DeleteSelectedIssueCommand}"
+                                    Content="Delete issue" />
+                        </StackPanel>
+                    </Border>
+                </ScrollViewer>
+            </Grid>
         </Grid>
 
         <Grid Grid.Column="1"
@@ -416,7 +1170,7 @@
                         <Grid ColumnDefinitions="230,170,170,*" ColumnSpacing="10">
                             <TextBox x:Name="ProjectFilterBox"
                                      Classes="search-box"
-                                     Watermark="is:open priority:high impact:high"
+                                     PlaceholderText="is:open priority:high impact:high"
                                      Text="{Binding ProjectFilterText, UpdateSourceTrigger=PropertyChanged}" />
                             <ComboBox Grid.Column="1"
                                       ItemsSource="{Binding AvailableProjectSortFields}"
@@ -558,7 +1312,7 @@
                                             <ItemsControl Grid.Row="1" ItemsSource="{Binding Items}">
                                                 <ItemsControl.ItemTemplate>
                                                     <DataTemplate x:DataType="vm:ProjectIssueItemViewModel">
-                                                        <Border Background="#FFFDF8"
+                                                        <Border Background="{StaticResource TrackySurfaceStrongBrush}"
                                                                 BorderBrush="{StaticResource TrackyBorderBrush}"
                                                                 BorderThickness="1"
                                                                 CornerRadius="8"
@@ -741,7 +1495,7 @@
                        TextWrapping="Wrap" />
         </Grid>
 
-        <Border Grid.Column="2" Classes="surface" Padding="20">
+        <Border Grid.Column="2" Classes="surface" Padding="20" IsVisible="False">
             <ScrollViewer>
                 <StackPanel Spacing="18">
                     <Border Background="{StaticResource TrackySurfaceStrongBrush}"
@@ -757,7 +1511,7 @@
 
                             <TextBlock Classes="muted" Text="Name" />
                             <TextBox x:Name="NewProjectNameBox"
-                                     Watermark="Tracky Phase 2"
+                                     PlaceholderText="Tracky Phase 2"
                                      Text="{Binding NewProjectName, UpdateSourceTrigger=PropertyChanged}" />
 
                             <TextBlock Classes="muted" Text="Description" />
@@ -765,7 +1519,7 @@
                                      Height="90"
                                      TextWrapping="Wrap"
                                      VerticalContentAlignment="Top"
-                                     Watermark="Project board, table, calendar, and timeline scope."
+                                     PlaceholderText="Project board, table, calendar, and timeline scope."
                                      Text="{Binding NewProjectDescription}" />
 
                             <Button x:Name="CreateProjectButton"
@@ -798,7 +1552,7 @@
 
                             <TextBlock Classes="muted" Text="Value" />
                             <TextBox x:Name="ProjectFieldValueBox"
-                                     Watermark="High"
+                                     PlaceholderText="High"
                                      Text="{Binding DraftCustomFieldValue, UpdateSourceTrigger=PropertyChanged}" />
 
                             <Button x:Name="SaveProjectCustomFieldValueButton"
@@ -820,7 +1574,7 @@
                             <ItemsControl ItemsSource="{Binding ProjectCustomFields}">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate x:DataType="vm:ProjectCustomFieldViewModel">
-                                        <Border Background="#FFFDF8"
+                                        <Border Background="{StaticResource TrackySurfaceStrongBrush}"
                                                 BorderBrush="{StaticResource TrackyBorderBrush}"
                                                 BorderThickness="1"
                                                 CornerRadius="8"
@@ -843,7 +1597,7 @@
                             </ItemsControl>
 
                             <TextBlock Classes="muted" Text="Field name" />
-                            <TextBox Watermark="Impact"
+                            <TextBox PlaceholderText="Impact"
                                      Text="{Binding DraftCustomFieldName, UpdateSourceTrigger=PropertyChanged}" />
 
                             <TextBlock Classes="muted" Text="Type" />
@@ -851,7 +1605,7 @@
                                       SelectedItem="{Binding DraftCustomFieldType}" />
 
                             <TextBlock Classes="muted" Text="Options" />
-                            <TextBox Watermark="Low, Medium, High"
+                            <TextBox PlaceholderText="Low, Medium, High"
                                      Text="{Binding DraftCustomFieldOptions}" />
 
                             <Button x:Name="AddProjectCustomFieldButton"
@@ -873,7 +1627,7 @@
                             <ItemsControl ItemsSource="{Binding ProjectSavedViews}">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate x:DataType="vm:ProjectSavedViewViewModel">
-                                        <Border Background="#FFFDF8"
+                                        <Border Background="{StaticResource TrackySurfaceStrongBrush}"
                                                 BorderBrush="{StaticResource TrackyBorderBrush}"
                                                 BorderThickness="1"
                                                 CornerRadius="8"
@@ -909,7 +1663,7 @@
                             </ItemsControl>
 
                             <TextBlock Classes="muted" Text="View name" />
-                            <TextBox Watermark="High impact board"
+                            <TextBox PlaceholderText="High impact board"
                                      Text="{Binding DraftSavedViewName, UpdateSourceTrigger=PropertyChanged}" />
 
                             <TextBlock Classes="muted" Text="Mode" />
@@ -917,7 +1671,7 @@
                                       SelectedItem="{Binding DraftSavedViewMode}" />
 
                             <TextBlock Classes="muted" Text="Filter" />
-                            <TextBox Watermark="is:open priority:high"
+                            <TextBox PlaceholderText="is:open priority:high"
                                      Text="{Binding DraftSavedViewFilter}" />
 
                             <TextBlock Classes="muted" Text="Sort" />
@@ -952,7 +1706,7 @@
                                           IsVisible="{Binding HasWorkspaceReminders}">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate x:DataType="vm:IssueReminderViewModel">
-                                        <Border Background="#FFFDF8"
+                                        <Border Background="{StaticResource TrackySurfaceStrongBrush}"
                                                 BorderBrush="{StaticResource TrackyBorderBrush}"
                                                 BorderThickness="1"
                                                 CornerRadius="8"
@@ -986,11 +1740,11 @@
                             </ItemsControl>
 
                             <TextBlock Classes="muted" Text="Title" />
-                            <TextBox Watermark="Follow up on selected issue"
+                            <TextBox PlaceholderText="Follow up on selected issue"
                                      Text="{Binding DraftReminderTitle, UpdateSourceTrigger=PropertyChanged}" />
 
                             <TextBlock Classes="muted" Text="Note" />
-                            <TextBox Watermark="What should be remembered?"
+                            <TextBox PlaceholderText="What should be remembered?"
                                      Text="{Binding DraftReminderNote}" />
 
                             <TextBlock Classes="muted" Text="Remind at" />
@@ -1021,7 +1775,7 @@
                                           IsVisible="{Binding HasSavedIssueSearches}">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate x:DataType="vm:SavedIssueSearchViewModel">
-                                        <Border Background="#FFFDF8"
+                                        <Border Background="{StaticResource TrackySurfaceStrongBrush}"
                                                 BorderBrush="{StaticResource TrackyBorderBrush}"
                                                 BorderThickness="1"
                                                 CornerRadius="8"
@@ -1048,13 +1802,13 @@
                             </ItemsControl>
 
                             <TextBlock Classes="muted" Text="Search name" />
-                            <TextBox Watermark="Open desktop work"
+                            <TextBox PlaceholderText="Open desktop work"
                                      Text="{Binding DraftSavedIssueSearchName, UpdateSourceTrigger=PropertyChanged}" />
 
                             <CheckBox Content="Pinned"
                                       IsChecked="{Binding DraftSavedIssueSearchPinned}" />
 
-                            <Button x:Name="SaveIssueSearchButton"
+                            <Button x:Name="LegacySaveIssueSearchButton"
                                     Classes="secondary"
                                     Command="{Binding SaveIssueSearchCommand}"
                                     Content="Save current search" />
@@ -1074,7 +1828,7 @@
                                           IsVisible="{Binding HasExportPresets}">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate x:DataType="vm:ExportPresetViewModel">
-                                        <Border Background="#FFFDF8"
+                                        <Border Background="{StaticResource TrackySurfaceStrongBrush}"
                                                 BorderBrush="{StaticResource TrackyBorderBrush}"
                                                 BorderThickness="1"
                                                 CornerRadius="8"
@@ -1120,15 +1874,15 @@
                             <CheckBox Content="Closed issues"
                                       IsChecked="{Binding DraftExportIncludeClosedIssues}" />
 
-                            <Button x:Name="ExportSelectionButton"
+                            <Button x:Name="LegacyExportSelectionButton"
                                     Classes="primary"
                                     Command="{Binding ExportSelectionCommand}"
                                     Content="Export selection" />
 
                             <TextBlock Classes="muted" Text="Preset name" />
-                            <TextBox Watermark="Weekly Markdown handoff"
+                            <TextBox PlaceholderText="Weekly Markdown handoff"
                                      Text="{Binding ExportPresetName, UpdateSourceTrigger=PropertyChanged}" />
-                            <Button x:Name="SaveExportPresetButton"
+                            <Button x:Name="LegacySaveExportPresetButton"
                                     Classes="secondary"
                                     Command="{Binding SaveExportPresetCommand}"
                                     Content="Save export preset" />
@@ -1156,10 +1910,10 @@
                                       IsChecked="{Binding CompactDensityPreference}" />
 
                             <TextBlock Classes="muted" Text="Shortcut profile" />
-                            <TextBox Watermark="Default"
+                            <TextBox PlaceholderText="Default"
                                      Text="{Binding ShortcutProfilePreference}" />
 
-                            <Button x:Name="SavePreferencesButton"
+                            <Button x:Name="LegacySavePreferencesButton"
                                     Classes="secondary"
                                     Command="{Binding SavePreferencesCommand}"
                                     Content="Save preferences" />
@@ -1173,17 +1927,15 @@
                             Padding="18"
                             IsVisible="{Binding IsQuickCaptureVisible}">
                         <StackPanel Spacing="14">
-                            <TextBlock Classes="section-title" Text="Quick Capture" />
-                            <TextBlock Classes="muted"
-                                       Text="This is the first Phase 1 capture flow: title, owner, priority, due date, and labels are written directly into the local SQLite workspace." />
+                            <TextBlock Classes="section-title" Text="New issue" />
 
                             <TextBlock Classes="muted" Text="Title" />
-                            <TextBox x:Name="QuickCaptureTitleBox"
-                                     Watermark="Ship workspace bootstrap and issue shell"
+                            <TextBox x:Name="LegacyQuickCaptureTitleBox"
+                                     PlaceholderText="Ship workspace bootstrap and issue shell"
                                      Text="{Binding DraftTitle}" />
 
                             <TextBlock Classes="muted" Text="Assignee" />
-                            <TextBox Watermark="Dabin"
+                            <TextBox PlaceholderText="Dabin"
                                      Text="{Binding DraftAssignee}" />
 
                             <TextBlock Classes="muted" Text="Priority" />
@@ -1194,26 +1946,26 @@
                             <DatePicker SelectedDate="{Binding DraftDueDate}" />
 
                             <TextBlock Classes="muted" Text="Project" />
-                            <TextBox Watermark="Tracky Foundation"
+                            <TextBox PlaceholderText="Tracky Foundation"
                                      Text="{Binding DraftProjectName}" />
 
                             <!-- Phase3 메타데이터는 생성 시점부터 저장해 검색, 프로젝트 동기화, 내보내기에서 같은 값을 사용한다. -->
                             <TextBlock Classes="muted" Text="Milestone" />
-                            <TextBox Watermark="MVP Readiness"
+                            <TextBox PlaceholderText="MVP Readiness"
                                      Text="{Binding DraftMilestoneName}" />
 
                             <TextBlock Classes="muted" Text="Issue type" />
-                            <TextBox Watermark="Task"
+                            <TextBox PlaceholderText="Task"
                                      Text="{Binding DraftIssueTypeName}" />
 
                             <TextBlock Classes="muted" Text="Labels" />
-                            <TextBox Watermark="foundation, desktop, ux"
+                            <TextBox PlaceholderText="foundation, desktop, ux"
                                      Text="{Binding DraftLabels}" />
 
-                            <Button x:Name="CreateIssueButton"
+                            <Button x:Name="LegacyCreateIssueButton"
                                     Classes="primary"
                                     Command="{Binding CreateIssueCommand}"
-                                    Content="Create issue in local workspace" />
+                                    Content="Submit new issue" />
                         </StackPanel>
                     </Border>
 
@@ -1224,26 +1976,24 @@
                             Padding="18"
                             IsVisible="{Binding IsIssueEditorVisible}">
                         <StackPanel Spacing="14">
-                            <TextBlock Classes="section-title" Text="Edit Issue" />
-                            <TextBlock Classes="muted"
-                                       Text="Phase 1 CRUD editing keeps the selected issue title, body, owner, due date, project, priority, and labels in the local SQLite workspace." />
+                            <TextBlock Classes="section-title" Text="Issue sidebar" />
 
                             <TextBlock Classes="muted" Text="Title" />
-                            <TextBox x:Name="IssueEditTitleBox"
-                                     Watermark="Issue title"
+                            <TextBox x:Name="LegacyIssueEditTitleBox"
+                                     PlaceholderText="Issue title"
                                      Text="{Binding EditTitle, UpdateSourceTrigger=PropertyChanged}" />
 
                             <TextBlock Classes="muted" Text="Description" />
-                            <TextBox x:Name="IssueEditDescriptionBox"
+                            <TextBox x:Name="LegacyIssueEditDescriptionBox"
                                      AcceptsReturn="True"
                                      Height="120"
                                      TextWrapping="Wrap"
                                      VerticalContentAlignment="Top"
-                                     Watermark="Write the issue body in Markdown."
+                                     PlaceholderText="Write the issue body in Markdown."
                                      Text="{Binding EditDescription}" />
 
                             <TextBlock Classes="muted" Text="Assignee" />
-                            <TextBox Watermark="Dabin"
+                            <TextBox PlaceholderText="Dabin"
                                      Text="{Binding EditAssignee}" />
 
                             <TextBlock Classes="muted" Text="Priority" />
@@ -1254,36 +2004,36 @@
                             <DatePicker SelectedDate="{Binding EditDueDate}" />
 
                             <TextBlock Classes="muted" Text="Project" />
-                            <TextBox Watermark="Tracky Foundation"
+                            <TextBox PlaceholderText="Tracky Foundation"
                                      Text="{Binding EditProjectName}" />
 
                             <!-- 편집 폼도 생성 폼과 같은 Phase3 메타데이터를 다뤄 저장 후 상세/필터 상태가 어긋나지 않게 한다. -->
                             <TextBlock Classes="muted" Text="Milestone" />
-                            <TextBox Watermark="MVP Readiness"
+                            <TextBox PlaceholderText="MVP Readiness"
                                      Text="{Binding EditMilestoneName}" />
 
                             <TextBlock Classes="muted" Text="Issue type" />
-                            <TextBox Watermark="Bug"
+                            <TextBox PlaceholderText="Bug"
                                      Text="{Binding EditIssueTypeName}" />
 
                             <TextBlock Classes="muted" Text="Labels" />
-                            <TextBox Watermark="foundation, desktop, ux"
+                            <TextBox PlaceholderText="foundation, desktop, ux"
                                      Text="{Binding EditLabels}" />
 
                             <TextBlock Classes="muted"
                                        IsVisible="{Binding CanChooseCloseReason}"
                                        Text="Close reason" />
-                            <ComboBox x:Name="CloseReasonComboBox"
+                            <ComboBox x:Name="LegacyCloseReasonComboBox"
                                       ItemsSource="{Binding AvailableCloseReasons}"
                                       SelectedItem="{Binding SelectedCloseReason}"
                                       IsVisible="{Binding CanChooseCloseReason}" />
 
                             <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
-                                <Button x:Name="UpdateIssueButton"
+                                <Button x:Name="LegacyUpdateIssueButton"
                                         Classes="primary"
                                         Command="{Binding UpdateSelectedIssueCommand}"
-                                        Content="Save issue changes" />
-                                <Button x:Name="DeleteIssueButton"
+                                        Content="Save changes" />
+                                <Button x:Name="LegacyDeleteIssueButton"
                                         Grid.Column="1"
                                         Classes="secondary"
                                         Command="{Binding DeleteSelectedIssueCommand}"
@@ -1299,8 +2049,8 @@
                             Padding="18"
                             IsVisible="{Binding IsIssuesViewActive}">
                         <StackPanel Spacing="10">
-                            <TextBlock Classes="section-title" Text="Detail Status" />
-                            <TextBlock x:Name="DetailStatusMessageText"
+                            <TextBlock Classes="section-title" Text="Timeline status" />
+                            <TextBlock x:Name="LegacyDetailStatusMessageText"
                                        Classes="muted"
                                        Text="{Binding DetailStatusMessage}"
                                        TextWrapping="Wrap" />
@@ -1314,15 +2064,15 @@
                             Padding="18"
                             IsVisible="{Binding IsIssueDetailPlaceholderVisible}">
                         <StackPanel Spacing="10">
-                            <TextBlock Classes="section-title" Text="Issue Details" />
+                            <TextBlock Classes="section-title" Text="No issue selected" />
                             <TextBlock Classes="muted"
-                                       Text="Select an issue from the All Issues list to inspect its description, timeline, comments, and attachments." />
+                                       Text="Choose an issue row to inspect its body, timeline, comments, and attachments." />
                         </StackPanel>
                     </Border>
 
-                    <ContentControl x:Name="SelectedIssueDetailContent"
+                    <ContentControl x:Name="LegacySelectedIssueDetailContent"
                                     Content="{Binding SelectedIssueDetail}"
-                                    IsVisible="{Binding IsSelectedIssueDetailVisible}">
+                                    IsVisible="False">
                         <ContentControl.ContentTemplate>
                             <DataTemplate x:DataType="vm:IssueDetailViewModel">
                                 <StackPanel Spacing="18">
@@ -1403,7 +2153,7 @@
                                                 </ItemsControl.ItemsPanel>
                                                 <ItemsControl.ItemTemplate>
                                                     <DataTemplate>
-                                                        <Border Background="#F3F4F6"
+                                                        <Border Background="{StaticResource TrackySurfaceStrongBrush}"
                                                                 CornerRadius="999"
                                                                 Margin="0,0,8,8"
                                                                 Padding="10,4">
@@ -1454,7 +2204,7 @@
                                                           IsVisible="{Binding HasRelations}">
                                                 <ItemsControl.ItemTemplate>
                                                     <DataTemplate x:DataType="vm:IssueRelationViewModel">
-                                                        <Border Background="#FFFDF8"
+                                                        <Border Background="{StaticResource TrackySurfaceStrongBrush}"
                                                                 BorderBrush="{StaticResource TrackyBorderBrush}"
                                                                 BorderThickness="1"
                                                                 CornerRadius="8"
@@ -1485,7 +2235,7 @@
                                             </ItemsControl>
 
                                             <Grid ColumnDefinitions="*,150" ColumnSpacing="10">
-                                                <TextBox Watermark="Target issue number"
+                                                <TextBox PlaceholderText="Target issue number"
                                                          Text="{Binding #RootWindow.((vm:MainWindowViewModel)DataContext).DraftRelationTargetIssueNumber}" />
                                                 <ComboBox Grid.Column="1"
                                                           ItemsSource="{Binding #RootWindow.((vm:MainWindowViewModel)DataContext).AvailableIssueRelationTypes}"
@@ -1509,7 +2259,7 @@
                                                        Text="Use this composer to record notes directly into the local issue timeline." />
 
                                             <TextBlock Classes="muted" Text="Author" />
-                                            <TextBox Watermark="Dabin"
+                                            <TextBox PlaceholderText="Dabin"
                                                      Text="{Binding #RootWindow.((vm:MainWindowViewModel)DataContext).DraftCommentAuthor}" />
 
                                             <TextBlock Classes="muted" Text="Comment" />
@@ -1518,7 +2268,7 @@
                                                      Height="120"
                                                      TextWrapping="Wrap"
                                                      VerticalContentAlignment="Top"
-                                                     Watermark="Write the next decision, observation, or implementation note."
+                                                     PlaceholderText="Write the next decision, observation, or implementation note."
                                                      Text="{Binding #RootWindow.((vm:MainWindowViewModel)DataContext).DraftCommentBody}" />
 
                                             <Button x:Name="AddCommentButton"
@@ -1555,7 +2305,7 @@
                                                           IsVisible="{Binding HasAttachments}">
                                                 <ItemsControl.ItemTemplate>
                                                     <DataTemplate x:DataType="vm:IssueAttachmentViewModel">
-                                                        <Border Background="#FFFDF8"
+                                                        <Border Background="{StaticResource TrackySurfaceStrongBrush}"
                                                                 BorderBrush="{StaticResource TrackyBorderBrush}"
                                                                 BorderThickness="1"
                                                                 CornerRadius="8"
@@ -1603,7 +2353,7 @@
                                                           IsVisible="{Binding HasReminders}">
                                                 <ItemsControl.ItemTemplate>
                                                     <DataTemplate x:DataType="vm:IssueReminderViewModel">
-                                                        <Border Background="#FFFDF8"
+                                                        <Border Background="{StaticResource TrackySurfaceStrongBrush}"
                                                                 BorderBrush="{StaticResource TrackyBorderBrush}"
                                                                 BorderThickness="1"
                                                                 CornerRadius="8"
@@ -1662,7 +2412,7 @@
                                                           IsVisible="{Binding HasComments}">
                                                 <ItemsControl.ItemTemplate>
                                                     <DataTemplate x:DataType="vm:IssueCommentViewModel">
-                                                        <Border Background="#FFFDF8"
+                                                        <Border Background="{StaticResource TrackySurfaceStrongBrush}"
                                                                 BorderBrush="{StaticResource TrackyBorderBrush}"
                                                                 BorderThickness="1"
                                                                 CornerRadius="8"
@@ -1706,7 +2456,7 @@
                                                           IsVisible="{Binding HasActivity}">
                                                 <ItemsControl.ItemTemplate>
                                                     <DataTemplate x:DataType="vm:IssueActivityViewModel">
-                                                        <Border Background="#FFFDF8"
+                                                        <Border Background="{StaticResource TrackySurfaceStrongBrush}"
                                                                 BorderBrush="{StaticResource TrackyBorderBrush}"
                                                                 BorderThickness="1"
                                                                 CornerRadius="8"
