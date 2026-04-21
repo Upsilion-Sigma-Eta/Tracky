@@ -1,19 +1,14 @@
 namespace Tracky.Infrastructure.Persistence;
 
-public sealed class TrackyWorkspacePathProvider
+public sealed class TrackyWorkspacePathProvider(string rootDirectory)
 {
-    private readonly string _rootDirectory;
+    private readonly string _rootDirectory = rootDirectory;
 
     public TrackyWorkspacePathProvider()
         : this(Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "Tracky"))
     {
-    }
-
-    public TrackyWorkspacePathProvider(string rootDirectory)
-    {
-        _rootDirectory = rootDirectory;
     }
 
     public string GetDatabasePath()

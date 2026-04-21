@@ -17,8 +17,7 @@ public sealed class SqliteTrackyWorkspaceServiceTests
         try
         {
             var service = new SqliteTrackyWorkspaceService(
-                new TrackyWorkspacePathProvider(testRoot),
-                new IssueOverviewCalculator());
+                new TrackyWorkspacePathProvider(testRoot));
 
             var seededOverview = await service.GetOverviewAsync();
             Assert.NotEmpty(seededOverview.Issues);
@@ -35,6 +34,25 @@ public sealed class SqliteTrackyWorkspaceServiceTests
 
             var overviewAfterCreate = await service.GetOverviewAsync();
             Assert.Contains(overviewAfterCreate.Issues, issue => issue.Id == createdIssue.Id);
+
+            var metadataUpdate = await service.UpdateIssueAsync(
+                new UpdateIssueInput(
+                    createdIssue.Id,
+                    "Add workspace switching shell and selector metadata",
+                    "The selector should keep issue metadata editable from the Phase 1 detail panel.",
+                    "Tracky Maintainer",
+                    IssuePriority.Critical,
+                    new DateOnly(2026, 4, 24),
+                    "Tracky Shell",
+                    ["foundation", "metadata", "desktop"]));
+
+            Assert.NotNull(metadataUpdate);
+            Assert.Equal("Add workspace switching shell and selector metadata", metadataUpdate.Title);
+            Assert.Equal("Tracky Maintainer", metadataUpdate.AssigneeDisplayName);
+            Assert.Equal(IssuePriority.Critical, metadataUpdate.Priority);
+            Assert.Equal(new DateOnly(2026, 4, 24), metadataUpdate.DueDate);
+            Assert.Equal("Tracky Shell", metadataUpdate.ProjectName);
+            Assert.Contains("metadata", metadataUpdate.Labels);
 
             var comment = await service.AddIssueCommentAsync(
                 new AddIssueCommentInput(
@@ -60,19 +78,24 @@ public sealed class SqliteTrackyWorkspaceServiceTests
                     IssueStateReason.Completed));
 
             Assert.NotNull(updatedIssue);
-            Assert.Equal(IssueWorkflowState.Closed, updatedIssue!.State);
+            Assert.Equal(IssueWorkflowState.Closed, updatedIssue.State);
             Assert.Equal(IssueStateReason.Completed, updatedIssue.StateReason);
 
             var detail = await service.GetIssueDetailAsync(createdIssue.Id);
             Assert.NotNull(detail);
-            Assert.Single(detail!.Comments);
+            Assert.Equal("The selector should keep issue metadata editable from the Phase 1 detail panel.", detail.Description);
+            Assert.Single(detail.Comments);
             Assert.Single(detail.Attachments);
+            Assert.Contains(detail.Activity, item => item.EventType == "issue.updated");
             Assert.Contains(detail.Activity, item => item.EventType == "issue.comment.added");
             Assert.Contains(detail.Activity, item => item.EventType == "issue.attachment.added");
 
             var exportedAttachmentPath = await service.ExportAttachmentToTempFileAsync(detail.Attachments[0].Id);
             Assert.False(string.IsNullOrWhiteSpace(exportedAttachmentPath));
             Assert.True(File.Exists(exportedAttachmentPath));
+
+            Assert.True(await service.DeleteIssueAsync(createdIssue.Id));
+            Assert.Null(await service.GetIssueDetailAsync(createdIssue.Id));
         }
         finally
         {
@@ -96,17 +119,291 @@ public sealed class SqliteTrackyWorkspaceServiceTests
         try
         {
             var service = new SqliteTrackyWorkspaceService(
-                new TrackyWorkspacePathProvider(testRoot),
-                new IssueOverviewCalculator());
+                new TrackyWorkspacePathProvider(testRoot));
 
             var overview = await service.GetOverviewAsync();
             var seededIssueWithAttachment = overview.Issues.First(issue => issue.AttachmentCount > 0);
             var detail = await service.GetIssueDetailAsync(seededIssueWithAttachment.Id);
 
             Assert.NotNull(detail);
-            Assert.False(string.IsNullOrWhiteSpace(detail!.Description));
+            Assert.False(string.IsNullOrWhiteSpace(detail.Description));
             Assert.NotEmpty(detail.Activity);
             Assert.Equal(seededIssueWithAttachment.AttachmentCount, detail.Attachments.Count);
+        }
+        finally
+        {
+            SqliteConnection.ClearAllPools();
+
+            if (Directory.Exists(testRoot))
+            {
+                Directory.Delete(testRoot, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task State_reason_transitions_round_trip_close_reasons_and_reopen_clears_reason()
+    {
+        var testRoot = Path.Combine(
+            Path.GetTempPath(),
+            "Tracky.Tests",
+            Guid.NewGuid().ToString("N"));
+
+        try
+        {
+            var service = new SqliteTrackyWorkspaceService(
+                new TrackyWorkspacePathProvider(testRoot));
+
+            var issue = await service.CreateIssueAsync(
+                new CreateIssueInput(
+                    "Exercise every Phase 1 close reason",
+                    "Dabin",
+                    IssuePriority.High,
+                    null,
+                    "Tracky State Model",
+                    ["state"]));
+
+            foreach (var closeReason in new[]
+            {
+                IssueStateReason.Completed,
+                IssueStateReason.NotPlanned,
+                IssueStateReason.Duplicate,
+                IssueStateReason.None,
+            })
+            {
+                var expectedReason = closeReason == IssueStateReason.None
+                    ? IssueStateReason.Completed
+                    : closeReason;
+
+                var closedIssue = await service.UpdateIssueStateAsync(
+                    new UpdateIssueStateInput(issue.Id, IssueWorkflowState.Closed, closeReason));
+
+                Assert.NotNull(closedIssue);
+                Assert.Equal(IssueWorkflowState.Closed, closedIssue.State);
+                Assert.Equal(expectedReason, closedIssue.StateReason);
+
+                var reopenedIssue = await service.UpdateIssueStateAsync(
+                    new UpdateIssueStateInput(issue.Id, IssueWorkflowState.Open, IssueStateReason.Duplicate));
+
+                Assert.NotNull(reopenedIssue);
+                Assert.Equal(IssueWorkflowState.Open, reopenedIssue.State);
+                Assert.Equal(IssueStateReason.None, reopenedIssue.StateReason);
+            }
+        }
+        finally
+        {
+            SqliteConnection.ClearAllPools();
+
+            if (Directory.Exists(testRoot))
+            {
+                Directory.Delete(testRoot, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task Update_issue_trims_optional_metadata_and_deduplicates_labels()
+    {
+        var testRoot = Path.Combine(
+            Path.GetTempPath(),
+            "Tracky.Tests",
+            Guid.NewGuid().ToString("N"));
+
+        try
+        {
+            var service = new SqliteTrackyWorkspaceService(
+                new TrackyWorkspacePathProvider(testRoot));
+
+            var issue = await service.CreateIssueAsync(
+                new CreateIssueInput(
+                    "Normalize issue metadata",
+                    "Dabin",
+                    IssuePriority.Medium,
+                    new DateOnly(2026, 4, 25),
+                    "Tracky Metadata",
+                    ["foundation"]));
+
+            var updatedIssue = await service.UpdateIssueAsync(
+                new UpdateIssueInput(
+                    issue.Id,
+                    "  Normalized issue metadata  ",
+                    "  Body should be trimmed.  ",
+                    "   ",
+                    IssuePriority.None,
+                    null,
+                    "   ",
+                    ["ux", " UX ", "", "bug", "bug"]));
+
+            Assert.NotNull(updatedIssue);
+            Assert.Equal("Normalized issue metadata", updatedIssue.Title);
+            Assert.Null(updatedIssue.AssigneeDisplayName);
+            Assert.Null(updatedIssue.DueDate);
+            Assert.Null(updatedIssue.ProjectName);
+            Assert.Equal(IssuePriority.None, updatedIssue.Priority);
+            Assert.Equal(2, updatedIssue.Labels.Count);
+            Assert.Contains("ux", updatedIssue.Labels);
+            Assert.Contains("bug", updatedIssue.Labels);
+
+            var detail = await service.GetIssueDetailAsync(issue.Id);
+            Assert.NotNull(detail);
+            Assert.Equal("Body should be trimmed.", detail.Description);
+        }
+        finally
+        {
+            SqliteConnection.ClearAllPools();
+
+            if (Directory.Exists(testRoot))
+            {
+                Directory.Delete(testRoot, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task Attachment_export_sanitizes_windows_unsafe_file_names_and_defaults_content_type()
+    {
+        var testRoot = Path.Combine(
+            Path.GetTempPath(),
+            "Tracky.Tests",
+            Guid.NewGuid().ToString("N"));
+
+        try
+        {
+            var service = new SqliteTrackyWorkspaceService(
+                new TrackyWorkspacePathProvider(testRoot));
+
+            var issue = await service.CreateIssueAsync(
+                new CreateIssueInput(
+                    "Attach a Windows unsafe file name",
+                    "Dabin",
+                    IssuePriority.Low,
+                    null,
+                    "Tracky Attachments",
+                    ["attachment"]));
+            var content = "Attachment content should survive the temp export."u8.ToArray();
+
+            var attachment = await service.AddIssueAttachmentAsync(
+                new AddIssueAttachmentInput(
+                    issue.Id,
+                    "phase1:notes?.txt",
+                    "",
+                    content));
+
+            Assert.NotNull(attachment);
+            Assert.Equal("application/octet-stream", attachment.ContentType);
+
+            var exportedPath = await service.ExportAttachmentToTempFileAsync(attachment.Id);
+            Assert.False(string.IsNullOrWhiteSpace(exportedPath));
+
+            var exportedFileName = Path.GetFileName(exportedPath);
+            Assert.DoesNotContain(':', exportedFileName);
+            Assert.DoesNotContain('?', exportedFileName);
+            Assert.Equal(content, await File.ReadAllBytesAsync(exportedPath));
+        }
+        finally
+        {
+            SqliteConnection.ClearAllPools();
+
+            if (Directory.Exists(testRoot))
+            {
+                Directory.Delete(testRoot, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task Invalid_required_inputs_throw_without_mutating_the_workspace()
+    {
+        var testRoot = Path.Combine(
+            Path.GetTempPath(),
+            "Tracky.Tests",
+            Guid.NewGuid().ToString("N"));
+
+        try
+        {
+            var service = new SqliteTrackyWorkspaceService(
+                new TrackyWorkspacePathProvider(testRoot));
+            var baselineOverview = await service.GetOverviewAsync();
+            var issue = await service.CreateIssueAsync(
+                new CreateIssueInput(
+                    "Validate required inputs",
+                    "Dabin",
+                    IssuePriority.Medium,
+                    null,
+                    "Tracky Validation",
+                    ["validation"]));
+
+            await Assert.ThrowsAsync<ArgumentException>(
+                () => service.CreateIssueAsync(
+                    new CreateIssueInput("   ", "Dabin", IssuePriority.Low, null, null, [])));
+            await Assert.ThrowsAsync<ArgumentException>(
+                () => service.UpdateIssueAsync(
+                    new UpdateIssueInput(issue.Id, "   ", "body", "Dabin", IssuePriority.Low, null, null, [])));
+            await Assert.ThrowsAsync<ArgumentException>(
+                () => service.AddIssueCommentAsync(
+                    new AddIssueCommentInput(issue.Id, "Dabin", "   ")));
+            await Assert.ThrowsAsync<ArgumentException>(
+                () => service.AddIssueCommentAsync(
+                    new AddIssueCommentInput(issue.Id, "   ", "Body")));
+            await Assert.ThrowsAsync<ArgumentException>(
+                () => service.AddIssueAttachmentAsync(
+                    new AddIssueAttachmentInput(issue.Id, "   ", "text/plain", [])));
+            await Assert.ThrowsAsync<ArgumentNullException>(
+                () => service.AddIssueAttachmentAsync(
+                    new AddIssueAttachmentInput(issue.Id, "file.txt", "text/plain", null!)));
+
+            var overviewAfterInvalidInputs = await service.GetOverviewAsync();
+            Assert.Equal(baselineOverview.Issues.Count + 1, overviewAfterInvalidInputs.Issues.Count);
+
+            var detail = await service.GetIssueDetailAsync(issue.Id);
+            Assert.NotNull(detail);
+            Assert.Empty(detail.Comments);
+            Assert.Empty(detail.Attachments);
+        }
+        finally
+        {
+            SqliteConnection.ClearAllPools();
+
+            if (Directory.Exists(testRoot))
+            {
+                Directory.Delete(testRoot, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task Delete_issue_cascades_comments_attachments_labels_and_export_content()
+    {
+        var testRoot = Path.Combine(
+            Path.GetTempPath(),
+            "Tracky.Tests",
+            Guid.NewGuid().ToString("N"));
+
+        try
+        {
+            var service = new SqliteTrackyWorkspaceService(
+                new TrackyWorkspacePathProvider(testRoot));
+            var issue = await service.CreateIssueAsync(
+                new CreateIssueInput(
+                    "Delete should cascade child data",
+                    "Dabin",
+                    IssuePriority.High,
+                    null,
+                    "Tracky Delete",
+                    ["delete", "cascade"]));
+            var comment = await service.AddIssueCommentAsync(
+                new AddIssueCommentInput(issue.Id, "Dabin", "This comment should be removed with the issue."));
+            var attachment = await service.AddIssueAttachmentAsync(
+                new AddIssueAttachmentInput(issue.Id, "cascade.txt", "text/plain", "cascade"u8.ToArray()));
+
+            Assert.NotNull(comment);
+            Assert.NotNull(attachment);
+            Assert.True(await service.DeleteIssueAsync(issue.Id));
+
+            var overview = await service.GetOverviewAsync();
+            Assert.DoesNotContain(overview.Issues, item => item.Id == issue.Id);
+            Assert.Null(await service.GetIssueDetailAsync(issue.Id));
+            Assert.Null(await service.ExportAttachmentToTempFileAsync(attachment.Id));
         }
         finally
         {
@@ -130,8 +427,7 @@ public sealed class SqliteTrackyWorkspaceServiceTests
         try
         {
             var service = new SqliteTrackyWorkspaceService(
-                new TrackyWorkspacePathProvider(testRoot),
-                new IssueOverviewCalculator());
+                new TrackyWorkspacePathProvider(testRoot));
 
             var missingIssueId = Guid.NewGuid();
             var missingDetail = await service.GetIssueDetailAsync(missingIssueId);
@@ -140,6 +436,16 @@ public sealed class SqliteTrackyWorkspaceServiceTests
                     missingIssueId,
                     "Dabin",
                     "This comment should not be saved."));
+            var missingUpdate = await service.UpdateIssueAsync(
+                new UpdateIssueInput(
+                    missingIssueId,
+                    "Missing issue",
+                    "This update should not be saved.",
+                    "Dabin",
+                    IssuePriority.Low,
+                    null,
+                    null,
+                    ["missing"]));
             var missingAttachment = await service.AddIssueAttachmentAsync(
                 new AddIssueAttachmentInput(
                     missingIssueId,
@@ -150,8 +456,10 @@ public sealed class SqliteTrackyWorkspaceServiceTests
 
             Assert.Null(missingDetail);
             Assert.Null(missingComment);
+            Assert.Null(missingUpdate);
             Assert.Null(missingAttachment);
             Assert.Null(missingAttachmentPath);
+            Assert.False(await service.DeleteIssueAsync(missingIssueId));
         }
         finally
         {

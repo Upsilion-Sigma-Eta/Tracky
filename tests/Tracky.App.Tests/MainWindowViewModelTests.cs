@@ -1,4 +1,3 @@
-using CommunityToolkit.Mvvm.Input;
 using Tracky.App.Tests.TestDoubles;
 using Tracky.App.ViewModels;
 using Tracky.Core.Issues;
@@ -10,7 +9,7 @@ public sealed class MainWindowViewModelTests
     [Fact]
     public async Task Initialize_filters_and_loads_the_selected_issue_detail()
     {
-        var viewModel = CreateViewModel(out _, out _, out _);
+        var viewModel = CreateViewModel(out _, out _);
 
         await viewModel.InitializeAsync();
         await TestWaiter.UntilAsync(
@@ -37,9 +36,40 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
+    public async Task Search_matches_number_assignee_project_and_label_and_clears_selection_when_empty()
+    {
+        var viewModel = CreateViewModel(out _, out _);
+
+        await viewModel.InitializeAsync();
+        await TestWaiter.UntilAsync(
+            () => viewModel.SelectedIssueDetail is not null,
+            "The selected issue detail was not loaded before search edge cases ran.");
+
+        viewModel.SearchText = "#201";
+        Assert.Single(viewModel.VisibleIssues);
+        Assert.Equal(201, viewModel.VisibleIssues[0].Number);
+
+        viewModel.SearchText = "Dabin";
+        Assert.Equal(2, viewModel.VisibleIssues.Count);
+
+        viewModel.SearchText = "Tracky Foundation";
+        Assert.Single(viewModel.VisibleIssues);
+        Assert.Equal("Prepare GUI test coverage for quick capture", viewModel.VisibleIssues[0].Title);
+
+        viewModel.SearchText = "desktop";
+        Assert.Single(viewModel.VisibleIssues);
+        Assert.Contains("desktop", viewModel.VisibleIssues[0].Labels);
+
+        viewModel.SearchText = "no matching issue";
+        Assert.Empty(viewModel.VisibleIssues);
+        Assert.Null(viewModel.SelectedIssue);
+        Assert.Null(viewModel.SelectedIssueDetail);
+    }
+
+    [Fact]
     public async Task Quick_capture_creates_and_selects_a_new_issue_with_detail_loaded()
     {
-        var viewModel = CreateViewModel(out _, out _, out _);
+        var viewModel = CreateViewModel(out _, out _);
         await viewModel.InitializeAsync();
 
         viewModel.DraftTitle = "Write a broader GUI regression suite";
@@ -48,7 +78,7 @@ public sealed class MainWindowViewModelTests
         viewModel.DraftProjectName = "Tracky Tests";
         viewModel.DraftLabels = "tests, gui";
 
-        await ((IAsyncRelayCommand)viewModel.CreateIssueCommand).ExecuteAsync(null);
+        await viewModel.CreateIssueCommand.ExecuteAsync();
         await TestWaiter.UntilAsync(
             () => viewModel.SelectedIssueDetail?.Summary.Title == "Write a broader GUI regression suite",
             "The quick-captured issue was not selected with its detail loaded.");
@@ -60,6 +90,37 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
+    public async Task Commands_reject_blank_required_fields_and_cancelled_attachment_imports()
+    {
+        var viewModel = CreateViewModel(out var picker, out _);
+
+        await viewModel.InitializeAsync();
+        await TestWaiter.UntilAsync(
+            () => viewModel.SelectedIssueDetail is not null,
+            "The selected issue detail was not loaded before command edge cases ran.");
+
+        viewModel.DraftTitle = "   ";
+        Assert.False(viewModel.CreateIssueCommand.CanExecute(null));
+
+        viewModel.EditTitle = "   ";
+        Assert.False(viewModel.UpdateSelectedIssueCommand.CanExecute(null));
+
+        viewModel.DraftCommentBody = "   ";
+        Assert.False(viewModel.AddCommentCommand.CanExecute(null));
+
+        viewModel.DraftCommentBody = "Valid body";
+        viewModel.DraftCommentAuthor = "   ";
+        Assert.False(viewModel.AddCommentCommand.CanExecute(null));
+
+        var attachmentCount = viewModel.SelectedIssueDetail!.Attachments.Count;
+        await viewModel.AttachFileCommand.ExecuteAsync();
+
+        Assert.Equal(1, picker.PickCount);
+        Assert.Equal(attachmentCount, viewModel.SelectedIssueDetail!.Attachments.Count);
+        Assert.Contains("canceled", viewModel.DetailStatusMessage, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task Detail_commands_add_comment_attach_file_and_open_exported_attachment()
     {
         var temporaryAttachmentPath = Path.Combine(Path.GetTempPath(), $"tracky-input-{Guid.NewGuid():N}.txt");
@@ -67,7 +128,7 @@ public sealed class MainWindowViewModelTests
 
         try
         {
-            var viewModel = CreateViewModel(out _, out var picker, out var launcher);
+            var viewModel = CreateViewModel(out var picker, out var launcher);
             picker.NextPath = temporaryAttachmentPath;
 
             await viewModel.InitializeAsync();
@@ -76,18 +137,18 @@ public sealed class MainWindowViewModelTests
                 "The selected issue detail was not loaded before detail commands ran.");
 
             viewModel.DraftCommentBody = "The GUI command should append this comment to the selected issue.";
-            await ((IAsyncRelayCommand)viewModel.AddCommentCommand).ExecuteAsync(null);
+            await viewModel.AddCommentCommand.ExecuteAsync();
             await TestWaiter.UntilAsync(
                 () => viewModel.SelectedIssueDetail?.Comments.Count == 2,
                 "The comment command did not refresh the selected issue detail.");
 
-            await ((IAsyncRelayCommand)viewModel.AttachFileCommand).ExecuteAsync(null);
+            await viewModel.AttachFileCommand.ExecuteAsync();
             await TestWaiter.UntilAsync(
                 () => viewModel.SelectedIssueDetail?.Attachments.Count == 2,
                 "The attach-file command did not refresh the selected issue detail.");
 
             var attachment = viewModel.SelectedIssueDetail!.Attachments[0];
-            await ((IAsyncRelayCommand<IssueAttachmentViewModel?>)viewModel.OpenAttachmentCommand).ExecuteAsync(attachment);
+            await viewModel.OpenAttachmentCommand.ExecuteAsync(attachment);
 
             Assert.Equal(1, picker.PickCount);
             Assert.Single(launcher.OpenedPaths);
@@ -104,9 +165,49 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
+    public async Task Edit_commands_update_selected_issue_metadata_and_delete_it()
+    {
+        var viewModel = CreateViewModel(out _, out _);
+
+        await viewModel.InitializeAsync();
+        await TestWaiter.UntilAsync(
+            () => viewModel.SelectedIssueDetail is not null,
+            "The selected issue detail was not loaded before edit commands ran.");
+
+        var selectedIssueId = viewModel.SelectedIssue!.Id;
+        viewModel.EditTitle = "Refine the Phase 1 issue editor";
+        viewModel.EditDescription = "The selected issue editor should persist body and metadata changes.";
+        viewModel.EditAssignee = "Tracky Maintainer";
+        viewModel.EditPriority = IssuePriority.Critical;
+        viewModel.EditProjectName = "Tracky CRUD";
+        viewModel.EditLabels = "foundation, crud";
+
+        await viewModel.UpdateSelectedIssueCommand.ExecuteAsync();
+        await TestWaiter.UntilAsync(
+            () => viewModel.SelectedIssueDetail?.Summary.Title == "Refine the Phase 1 issue editor",
+            "The selected issue did not reload after metadata was updated.");
+
+        Assert.Equal(selectedIssueId, viewModel.SelectedIssue!.Id);
+        Assert.Equal("Tracky Maintainer", viewModel.SelectedIssue.AssigneeText);
+        Assert.Equal(IssuePriority.Critical, viewModel.SelectedIssue.Issue.Priority);
+        Assert.Equal("Tracky CRUD", viewModel.SelectedIssue.ProjectText);
+        Assert.Contains("crud", viewModel.SelectedIssue.Labels);
+        Assert.Equal("The selected issue editor should persist body and metadata changes.", viewModel.SelectedIssueDetail!.Detail.Description);
+        Assert.Contains("saved", viewModel.StatusMessage, StringComparison.OrdinalIgnoreCase);
+
+        await viewModel.DeleteSelectedIssueCommand.ExecuteAsync();
+        await TestWaiter.UntilAsync(
+            () => viewModel.TotalIssues == 1 && viewModel.VisibleIssues.All(issue => issue.Id != selectedIssueId),
+            "The selected issue was not removed from the All Issues list.");
+
+        Assert.DoesNotContain(viewModel.VisibleIssues, issue => issue.Id == selectedIssueId);
+        Assert.Contains("deleted", viewModel.StatusMessage, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task Toggle_selected_issue_state_closes_and_reopens_the_same_issue()
     {
-        var viewModel = CreateViewModel(out _, out _, out _);
+        var viewModel = CreateViewModel(out _, out _);
 
         await viewModel.InitializeAsync();
         await TestWaiter.UntilAsync(
@@ -114,24 +215,37 @@ public sealed class MainWindowViewModelTests
             "The default selected issue was not loaded as open.");
 
         var selectedIssueId = viewModel.SelectedIssue!.Id;
+        viewModel.SelectedCloseReason = IssueStateReason.Duplicate;
 
-        await ((IAsyncRelayCommand)viewModel.ToggleSelectedIssueStateCommand).ExecuteAsync(null);
+        await viewModel.ToggleSelectedIssueStateCommand.ExecuteAsync();
         await TestWaiter.UntilAsync(
-            () => viewModel.SelectedIssue?.Id == selectedIssueId && viewModel.SelectedIssue.IsClosed,
+            () => viewModel.SelectedIssue?.Id == selectedIssueId
+                && viewModel.SelectedIssue.IsClosed
+                && viewModel.SelectedIssue.Issue.StateReason == IssueStateReason.Duplicate,
             "The selected issue was not closed by the state command.");
 
-        await ((IAsyncRelayCommand)viewModel.ToggleSelectedIssueStateCommand).ExecuteAsync(null);
+        Assert.False(viewModel.CanChooseCloseReason);
+        Assert.Contains("duplicate", viewModel.StatusMessage, StringComparison.OrdinalIgnoreCase);
+
+        await viewModel.ToggleSelectedIssueStateCommand.ExecuteAsync();
         await TestWaiter.UntilAsync(
-            () => viewModel.SelectedIssue?.Id == selectedIssueId && viewModel.SelectedIssue.IsOpen,
+            () => viewModel.SelectedIssue?.Id == selectedIssueId
+                && viewModel.SelectedIssue.IsOpen
+                && viewModel.SelectedIssue.Issue.StateReason == IssueStateReason.None,
             "The selected issue was not reopened by the state command.");
+
+        await TestWaiter.UntilAsync(
+            () => viewModel.SelectedIssueDetail?.Summary.Id == selectedIssueId
+                && viewModel.SelectedCloseReason == IssueStateReason.Completed,
+            "The close reason draft was not reset after reopening the issue.");
+        Assert.True(viewModel.CanChooseCloseReason);
     }
 
     private static MainWindowViewModel CreateViewModel(
-        out TestTrackyWorkspaceService service,
         out TestAttachmentPicker picker,
         out TestAttachmentLauncher launcher)
     {
-        service = TestTrackyWorkspaceService.CreateDefault();
+        var service = TestTrackyWorkspaceService.CreateDefault();
         picker = new TestAttachmentPicker();
         launcher = new TestAttachmentLauncher();
         return new MainWindowViewModel(service, picker, launcher);

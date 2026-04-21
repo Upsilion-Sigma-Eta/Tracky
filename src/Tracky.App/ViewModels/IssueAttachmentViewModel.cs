@@ -1,15 +1,11 @@
+using System.Globalization;
 using Tracky.Core.Issues;
 
 namespace Tracky.App.ViewModels;
 
-public sealed class IssueAttachmentViewModel : ViewModelBase
+public sealed class IssueAttachmentViewModel(IssueAttachment attachment) : ViewModelBase
 {
-    public IssueAttachmentViewModel(IssueAttachment attachment)
-    {
-        Attachment = attachment;
-    }
-
-    public IssueAttachment Attachment { get; }
+    public IssueAttachment Attachment { get; } = attachment;
 
     public Guid Id => Attachment.Id;
 
@@ -17,7 +13,7 @@ public sealed class IssueAttachmentViewModel : ViewModelBase
 
     public string ContentType => Attachment.ContentType;
 
-    public string CreatedText => Attachment.CreatedAtUtc.ToLocalTime().ToString("MMM dd, HH:mm");
+    public string CreatedText => Attachment.CreatedAtUtc.ToLocalTime().ToString("MMM dd, HH:mm", CultureInfo.CurrentCulture);
 
     public string SizeText
     {
@@ -28,8 +24,8 @@ public sealed class IssueAttachmentViewModel : ViewModelBase
 
             return Attachment.SizeBytes switch
             {
-                >= (long)megabyte => $"{Attachment.SizeBytes / megabyte:F1} MB",
-                >= (long)kilobyte => $"{Attachment.SizeBytes / kilobyte:F1} KB",
+                >= (long)megabyte => $"{(Attachment.SizeBytes / megabyte).ToString("F1", CultureInfo.CurrentCulture)} MB",
+                >= (long)kilobyte => $"{(Attachment.SizeBytes / kilobyte).ToString("F1", CultureInfo.CurrentCulture)} KB",
                 _ => $"{Attachment.SizeBytes} B",
             };
         }

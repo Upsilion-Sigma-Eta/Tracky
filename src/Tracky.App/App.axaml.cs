@@ -1,7 +1,5 @@
-using System.Linq;
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
-using Avalonia.Data.Core;
 using Avalonia.Data.Core.Plugins;
 using Avalonia.Markup.Xaml;
 using Tracky.App.Services;
@@ -11,6 +9,8 @@ using Tracky.Infrastructure.Persistence;
 
 namespace Tracky.App;
 
+// ReSharper disable once PartialTypeWithSinglePart
+// Avalonia XAML 컴파일러가 App.axaml에서 partial 짝을 생성하므로 code-behind 쪽 partial 선언을 유지한다.
 public partial class App : Application
 {
     public override void Initialize()
@@ -24,9 +24,7 @@ public partial class App : Application
         {
             DisableAvaloniaDataAnnotationValidation();
 
-            var mainWindow = new MainWindow
-            {
-            };
+            var mainWindow = new MainWindow();
             var mainViewModel = new MainWindowViewModel(
                 new SqliteTrackyWorkspaceService(),
                 new WindowAttachmentPicker(mainWindow),

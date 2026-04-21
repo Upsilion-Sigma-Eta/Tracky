@@ -3,14 +3,9 @@ using Avalonia.Platform.Storage;
 
 namespace Tracky.App.Services;
 
-public sealed class WindowAttachmentPicker : IAttachmentPicker
+public sealed class WindowAttachmentPicker(Window window) : IAttachmentPicker
 {
-    private readonly Window _window;
-
-    public WindowAttachmentPicker(Window window)
-    {
-        _window = window;
-    }
+    private readonly Window _window = window;
 
     public async Task<string?> PickAttachmentAsync()
     {

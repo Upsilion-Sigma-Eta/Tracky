@@ -428,6 +428,72 @@
                             BorderBrush="{StaticResource TrackyBorderBrush}"
                             BorderThickness="1"
                             CornerRadius="22"
+                            Padding="18"
+                            IsVisible="{Binding HasSelectedIssueDetail}">
+                        <StackPanel Spacing="14">
+                            <TextBlock Classes="section-title" Text="Edit Issue" />
+                            <TextBlock Classes="muted"
+                                       Text="Phase 1 CRUD editing keeps the selected issue title, body, owner, due date, project, priority, and labels in the local SQLite workspace." />
+
+                            <TextBlock Classes="muted" Text="Title" />
+                            <TextBox x:Name="IssueEditTitleBox"
+                                     Watermark="Issue title"
+                                     Text="{Binding EditTitle, UpdateSourceTrigger=PropertyChanged}" />
+
+                            <TextBlock Classes="muted" Text="Description" />
+                            <TextBox x:Name="IssueEditDescriptionBox"
+                                     AcceptsReturn="True"
+                                     Height="120"
+                                     TextWrapping="Wrap"
+                                     VerticalContentAlignment="Top"
+                                     Watermark="Write the issue body in Markdown."
+                                     Text="{Binding EditDescription}" />
+
+                            <TextBlock Classes="muted" Text="Assignee" />
+                            <TextBox Watermark="Dabin"
+                                     Text="{Binding EditAssignee}" />
+
+                            <TextBlock Classes="muted" Text="Priority" />
+                            <ComboBox ItemsSource="{Binding AvailablePriorities}"
+                                      SelectedItem="{Binding EditPriority}" />
+
+                            <TextBlock Classes="muted" Text="Due date" />
+                            <DatePicker SelectedDate="{Binding EditDueDate}" />
+
+                            <TextBlock Classes="muted" Text="Project" />
+                            <TextBox Watermark="Tracky Foundation"
+                                     Text="{Binding EditProjectName}" />
+
+                            <TextBlock Classes="muted" Text="Labels" />
+                            <TextBox Watermark="foundation, desktop, ux"
+                                     Text="{Binding EditLabels}" />
+
+                            <TextBlock Classes="muted"
+                                       IsVisible="{Binding CanChooseCloseReason}"
+                                       Text="Close reason" />
+                            <ComboBox x:Name="CloseReasonComboBox"
+                                      ItemsSource="{Binding AvailableCloseReasons}"
+                                      SelectedItem="{Binding SelectedCloseReason}"
+                                      IsVisible="{Binding CanChooseCloseReason}" />
+
+                            <Grid ColumnDefinitions="*,*" ColumnSpacing="10">
+                                <Button x:Name="UpdateIssueButton"
+                                        Classes="primary"
+                                        Command="{Binding UpdateSelectedIssueCommand}"
+                                        Content="Save issue changes" />
+                                <Button x:Name="DeleteIssueButton"
+                                        Grid.Column="1"
+                                        Classes="secondary"
+                                        Command="{Binding DeleteSelectedIssueCommand}"
+                                        Content="Delete issue" />
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Background="{StaticResource TrackySurfaceStrongBrush}"
+                            BorderBrush="{StaticResource TrackyBorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="22"
                             Padding="18">
                         <StackPanel Spacing="10">
                             <TextBlock Classes="section-title" Text="Detail Status" />
@@ -503,19 +569,19 @@
                                             </WrapPanel>
 
                                             <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="10">
-                                                <TextBlock Classes="muted" Text="State detail" />
-                                                <TextBlock Grid.Column="1" Classes="body" Text="{Binding Summary.StateDetailText}" />
+                                                <TextBlock Grid.Row="0" Grid.Column="0" Classes="muted" Text="State detail" />
+                                                <TextBlock Grid.Row="0" Grid.Column="1" Classes="body" Text="{Binding Summary.StateDetailText}" />
 
-                                                <TextBlock Grid.Row="1" Classes="muted" Text="Assignee" />
+                                                <TextBlock Grid.Row="1" Grid.Column="0" Classes="muted" Text="Assignee" />
                                                 <TextBlock Grid.Row="1" Grid.Column="1" Classes="body" Text="{Binding Summary.AssigneeText}" />
 
-                                                <TextBlock Grid.Row="2" Classes="muted" Text="Project" />
+                                                <TextBlock Grid.Row="2" Grid.Column="0" Classes="muted" Text="Project" />
                                                 <TextBlock Grid.Row="2" Grid.Column="1" Classes="body" Text="{Binding Summary.ProjectText}" />
 
-                                                <TextBlock Grid.Row="3" Classes="muted" Text="Comments" />
+                                                <TextBlock Grid.Row="3" Grid.Column="0" Classes="muted" Text="Comments" />
                                                 <TextBlock Grid.Row="3" Grid.Column="1" Classes="body" Text="{Binding CommentCountText}" />
 
-                                                <TextBlock Grid.Row="4" Classes="muted" Text="Attachments" />
+                                                <TextBlock Grid.Row="4" Grid.Column="0" Classes="muted" Text="Attachments" />
                                                 <TextBlock Grid.Row="4" Grid.Column="1" Classes="body" Text="{Binding AttachmentCountText}" />
                                             </Grid>
 
@@ -542,7 +608,7 @@
                                             <TextBlock Classes="muted" Text="{Binding Summary.UpdatedText}" />
 
                                             <Button Classes="secondary"
-                                                    Command="{Binding #RootWindow.DataContext.ToggleSelectedIssueStateCommand}"
+                                                    Command="{Binding #RootWindow.((vm:MainWindowViewModel)DataContext).ToggleSelectedIssueStateCommand}"
                                                     Content="{Binding Summary.ActionLabel}" />
                                         </StackPanel>
                                     </Border>
@@ -572,7 +638,7 @@
 
                                             <TextBlock Classes="muted" Text="Author" />
                                             <TextBox Watermark="Dabin"
-                                                     Text="{Binding #RootWindow.DataContext.DraftCommentAuthor}" />
+                                                     Text="{Binding #RootWindow.((vm:MainWindowViewModel)DataContext).DraftCommentAuthor}" />
 
                                             <TextBlock Classes="muted" Text="Comment" />
                                             <TextBox x:Name="CommentBodyBox"
@@ -581,11 +647,11 @@
                                                      TextWrapping="Wrap"
                                                      VerticalContentAlignment="Top"
                                                      Watermark="Write the next decision, observation, or implementation note."
-                                                     Text="{Binding #RootWindow.DataContext.DraftCommentBody}" />
+                                                     Text="{Binding #RootWindow.((vm:MainWindowViewModel)DataContext).DraftCommentBody}" />
 
                                             <Button x:Name="AddCommentButton"
                                                     Classes="primary"
-                                                    Command="{Binding #RootWindow.DataContext.AddCommentCommand}"
+                                                    Command="{Binding #RootWindow.((vm:MainWindowViewModel)DataContext).AddCommentCommand}"
                                                     Content="Add comment to selected issue" />
                                         </StackPanel>
                                     </Border>
@@ -605,7 +671,7 @@
                                                 <Button x:Name="AttachFileButton"
                                                         Grid.Column="1"
                                                         Classes="secondary"
-                                                        Command="{Binding #RootWindow.DataContext.AttachFileCommand}"
+                                                        Command="{Binding #RootWindow.((vm:MainWindowViewModel)DataContext).AttachFileCommand}"
                                                         Content="Attach file" />
                                             </Grid>
 
@@ -636,7 +702,7 @@
                                                                 </StackPanel>
                                                                 <Button Grid.Column="1"
                                                                         Classes="secondary"
-                                                                        Command="{Binding #RootWindow.DataContext.OpenAttachmentCommand}"
+                                                                        Command="{Binding #RootWindow.((vm:MainWindowViewModel)DataContext).OpenAttachmentCommand}"
                                                                         CommandParameter="{Binding}"
                                                                         Content="Open" />
                                                             </Grid>

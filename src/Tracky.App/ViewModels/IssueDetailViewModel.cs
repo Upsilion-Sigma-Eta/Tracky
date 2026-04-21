@@ -2,30 +2,21 @@ using Tracky.Core.Issues;
 
 namespace Tracky.App.ViewModels;
 
-public sealed class IssueDetailViewModel : ViewModelBase
+public sealed class IssueDetailViewModel(IssueDetail detail) : ViewModelBase
 {
-    public IssueDetailViewModel(IssueDetail detail)
-    {
-        Detail = detail;
-        Summary = new IssueCardViewModel(detail.Summary);
-        Comments = detail.Comments.Select(static comment => new IssueCommentViewModel(comment)).ToArray();
-        Attachments = detail.Attachments.Select(static attachment => new IssueAttachmentViewModel(attachment)).ToArray();
-        Activity = detail.Activity.Select(static activity => new IssueActivityViewModel(activity)).ToArray();
-    }
+    public IssueDetail Detail { get; } = detail;
 
-    public IssueDetail Detail { get; }
-
-    public IssueCardViewModel Summary { get; }
+    public IssueCardViewModel Summary { get; } = new IssueCardViewModel(detail.Summary);
 
     public string DescriptionText => string.IsNullOrWhiteSpace(Detail.Description)
         ? "No description has been written for this issue yet."
         : Detail.Description;
 
-    public IReadOnlyList<IssueCommentViewModel> Comments { get; }
+    public IReadOnlyList<IssueCommentViewModel> Comments { get; } = [.. detail.Comments.Select(static comment => new IssueCommentViewModel(comment))];
 
-    public IReadOnlyList<IssueAttachmentViewModel> Attachments { get; }
+    public IReadOnlyList<IssueAttachmentViewModel> Attachments { get; } = [.. detail.Attachments.Select(static attachment => new IssueAttachmentViewModel(attachment))];
 
-    public IReadOnlyList<IssueActivityViewModel> Activity { get; }
+    public IReadOnlyList<IssueActivityViewModel> Activity { get; } = [.. detail.Activity.Select(static activity => new IssueActivityViewModel(activity))];
 
     public bool HasComments => Comments.Count > 0;
 

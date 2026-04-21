@@ -1,17 +1,10 @@
-using System;
-using System.Collections.Generic;
 using Tracky.Core.Issues;
 
 namespace Tracky.App.ViewModels;
 
-public sealed class IssueCardViewModel : ViewModelBase
+public sealed class IssueCardViewModel(IssueListItem issue) : ViewModelBase
 {
-    public IssueCardViewModel(IssueListItem issue)
-    {
-        Issue = issue;
-    }
-
-    public IssueListItem Issue { get; }
+    public IssueListItem Issue { get; } = issue;
 
     public Guid Id => Issue.Id;
 
@@ -138,7 +131,7 @@ public sealed class IssueCardViewModel : ViewModelBase
     public string UpdatedText => $"Updated {Issue.UpdatedAtUtc.ToLocalTime():MMM dd, HH:mm}";
 
     public string ActionLabel => IsOpen
-        ? "Close as completed"
+        ? "Close issue"
         : "Reopen issue";
 
     public string CardBorderBrush => IsOverdue

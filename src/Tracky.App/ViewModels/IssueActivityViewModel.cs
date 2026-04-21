@@ -1,19 +1,15 @@
+using System.Globalization;
 using Tracky.Core.Issues;
 
 namespace Tracky.App.ViewModels;
 
-public sealed class IssueActivityViewModel : ViewModelBase
+public sealed class IssueActivityViewModel(IssueActivityEntry activity) : ViewModelBase
 {
-    public IssueActivityViewModel(IssueActivityEntry activity)
-    {
-        Activity = activity;
-    }
-
-    public IssueActivityEntry Activity { get; }
+    public IssueActivityEntry Activity { get; } = activity;
 
     public string Summary => Activity.Summary;
 
-    public string CreatedText => Activity.CreatedAtUtc.ToLocalTime().ToString("MMM dd, HH:mm");
+    public string CreatedText => Activity.CreatedAtUtc.ToLocalTime().ToString("MMM dd, HH:mm", CultureInfo.CurrentCulture);
 
     public string EventLabel => Activity.EventType switch
     {

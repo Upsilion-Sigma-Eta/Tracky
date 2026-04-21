@@ -11,29 +11,18 @@ public sealed class TestTrackyWorkspaceService : ITrackyWorkspaceService
     private readonly Dictionary<Guid, List<IssueAttachment>> _attachmentsByIssueId = [];
     private readonly Dictionary<Guid, List<IssueComment>> _commentsByIssueId = [];
     private readonly Dictionary<Guid, string> _descriptionByIssueId = [];
-    private readonly IssueOverviewCalculator _overviewCalculator = new();
     private readonly List<IssueListItem> _issues = [];
 
     private TestTrackyWorkspaceService()
     {
     }
 
-    public Guid OpenIssueId { get; private init; }
-
-    public Guid ClosedIssueId { get; private init; }
-
-    public IReadOnlyList<IssueListItem> Issues => _issues;
-
     public static TestTrackyWorkspaceService CreateDefault()
     {
         var now = DateTimeOffset.UtcNow;
         var openIssueId = Guid.NewGuid();
         var closedIssueId = Guid.NewGuid();
-        var service = new TestTrackyWorkspaceService
-        {
-            OpenIssueId = openIssueId,
-            ClosedIssueId = closedIssueId,
-        };
+        var service = new TestTrackyWorkspaceService();
 
         service._issues.Add(
             new IssueListItem(
@@ -115,7 +104,7 @@ public sealed class TestTrackyWorkspaceService : ITrackyWorkspaceService
             .OrderByDescending(static issue => issue.UpdatedAtUtc)
             .ThenByDescending(static issue => issue.Number)
             .ToArray();
-        var metrics = _overviewCalculator.Build(orderedIssues, DateOnly.FromDateTime(DateTime.Today));
+        var metrics = IssueOverviewCalculator.Build(orderedIssues, DateOnly.FromDateTime(DateTime.Today));
 
         return Task.FromResult(
             new WorkspaceOverview(
@@ -159,7 +148,7 @@ public sealed class TestTrackyWorkspaceService : ITrackyWorkspaceService
             input.ProjectName,
             0,
             0,
-            input.Labels.ToArray());
+            [.. input.Labels]);
 
         _issues.Add(issue);
         _descriptionByIssueId[issue.Id] = "Created by the quick capture flow.";
@@ -178,6 +167,38 @@ public sealed class TestTrackyWorkspaceService : ITrackyWorkspaceService
         return Task.FromResult(issue);
     }
 
+    public Task<IssueListItem?> UpdateIssueAsync(UpdateIssueInput input, CancellationToken cancellationToken = default)
+    {
+        var index = _issues.FindIndex(issue => issue.Id == input.IssueId);
+        if (index < 0)
+        {
+            return Task.FromResult<IssueListItem?>(null);
+        }
+
+        var existingIssue = _issues[index];
+        var updatedIssue = existingIssue with
+        {
+            Title = input.Title.Trim(),
+            Priority = input.Priority,
+            AssigneeDisplayName = string.IsNullOrWhiteSpace(input.AssigneeDisplayName)
+                ? null
+                : input.AssigneeDisplayName.Trim(),
+            DueDate = input.DueDate,
+            UpdatedAtUtc = DateTimeOffset.UtcNow,
+            ProjectName = string.IsNullOrWhiteSpace(input.ProjectName)
+                ? null
+                : input.ProjectName.Trim(),
+            Labels = [.. input.Labels],
+        };
+
+        // 테스트 더블도 프로덕션 서비스처럼 본문/라벨/메타데이터를 함께 갱신해야
+        // ViewModel 테스트가 실제 Phase 1 편집 흐름과 같은 계약을 검증한다.
+        _issues[index] = updatedIssue;
+        _descriptionByIssueId[input.IssueId] = input.Description.Trim();
+        AddActivity(input.IssueId, "issue.updated", "Issue title, body, and metadata were updated.");
+        return Task.FromResult<IssueListItem?>(updatedIssue);
+    }
+
     public Task<IssueListItem?> UpdateIssueStateAsync(UpdateIssueStateInput input, CancellationToken cancellationToken = default)
     {
         var index = _issues.FindIndex(issue => issue.Id == input.IssueId);
@@ -186,7 +207,7 @@ public sealed class TestTrackyWorkspaceService : ITrackyWorkspaceService
             return Task.FromResult<IssueListItem?>(null);
         }
 
-        var reason = input.State == IssueWorkflowState.Open ? IssueStateReason.None : input.Reason;
+        var reason = NormalizeStateReason(input.State, input.Reason);
         var updatedIssue = _issues[index] with
         {
             State = input.State,
@@ -194,8 +215,31 @@ public sealed class TestTrackyWorkspaceService : ITrackyWorkspaceService
             UpdatedAtUtc = DateTimeOffset.UtcNow,
         };
         _issues[index] = updatedIssue;
-        AddActivity(input.IssueId, "issue.state.changed", $"State changed to {input.State}.");
+        AddActivity(input.IssueId, "issue.state.changed", BuildStateSummary(input.State, reason));
         return Task.FromResult<IssueListItem?>(updatedIssue);
+    }
+
+    public Task<bool> DeleteIssueAsync(Guid issueId, CancellationToken cancellationToken = default)
+    {
+        var removed = _issues.RemoveAll(issue => issue.Id == issueId) > 0;
+        if (!removed)
+        {
+            return Task.FromResult(false);
+        }
+
+        if (_attachmentsByIssueId.TryGetValue(issueId, out var attachments))
+        {
+            foreach (var attachment in attachments)
+            {
+                _attachmentContentById.Remove(attachment.Id);
+            }
+        }
+
+        _descriptionByIssueId.Remove(issueId);
+        _commentsByIssueId.Remove(issueId);
+        _attachmentsByIssueId.Remove(issueId);
+        _activityByIssueId.Remove(issueId);
+        return Task.FromResult(true);
     }
 
     public Task<IssueComment?> AddIssueCommentAsync(AddIssueCommentInput input, CancellationToken cancellationToken = default)
@@ -238,7 +282,7 @@ public sealed class TestTrackyWorkspaceService : ITrackyWorkspaceService
             input.Content.LongLength,
             DateTimeOffset.UtcNow);
         _attachmentsByIssueId[input.IssueId].Add(attachment);
-        _attachmentContentById[attachment.Id] = input.Content.ToArray();
+        _attachmentContentById[attachment.Id] = [.. input.Content];
         _issues[issueIndex] = _issues[issueIndex] with
         {
             AttachmentCount = _attachmentsByIssueId[input.IssueId].Count,
@@ -260,24 +304,24 @@ public sealed class TestTrackyWorkspaceService : ITrackyWorkspaceService
         return path;
     }
 
-    private IReadOnlyList<IssueComment> GetComments(Guid issueId)
+    private IssueComment[] GetComments(Guid issueId)
     {
         return _commentsByIssueId.TryGetValue(issueId, out var comments)
-            ? comments.ToArray()
+            ? [.. comments]
             : [];
     }
 
-    private IReadOnlyList<IssueAttachment> GetAttachments(Guid issueId)
+    private IssueAttachment[] GetAttachments(Guid issueId)
     {
         return _attachmentsByIssueId.TryGetValue(issueId, out var attachments)
-            ? attachments.ToArray()
+            ? [.. attachments]
             : [];
     }
 
-    private IReadOnlyList<IssueActivityEntry> GetActivity(Guid issueId)
+    private IssueActivityEntry[] GetActivity(Guid issueId)
     {
         return _activityByIssueId.TryGetValue(issueId, out var activity)
-            ? activity.OrderByDescending(static item => item.CreatedAtUtc).ToArray()
+            ? [.. activity.OrderByDescending(static item => item.CreatedAtUtc)]
             : [];
     }
 
@@ -290,5 +334,24 @@ public sealed class TestTrackyWorkspaceService : ITrackyWorkspaceService
                 eventType,
                 summary,
                 DateTimeOffset.UtcNow));
+    }
+
+    private static IssueStateReason NormalizeStateReason(IssueWorkflowState state, IssueStateReason reason)
+    {
+        if (state == IssueWorkflowState.Open)
+        {
+            return IssueStateReason.None;
+        }
+
+        return reason == IssueStateReason.None
+            ? IssueStateReason.Completed
+            : reason;
+    }
+
+    private static string BuildStateSummary(IssueWorkflowState state, IssueStateReason reason)
+    {
+        return state == IssueWorkflowState.Open
+            ? "Issue was reopened for active work."
+            : $"Issue was closed as {reason}.";
     }
 }

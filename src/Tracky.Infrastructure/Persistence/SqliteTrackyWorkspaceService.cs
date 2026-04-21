@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text;
 using Microsoft.Data.Sqlite;
 using Tracky.Core.Issues;
@@ -6,7 +7,7 @@ using Tracky.Core.Workspaces;
 
 namespace Tracky.Infrastructure.Persistence;
 
-public sealed class SqliteTrackyWorkspaceService : ITrackyWorkspaceService
+public sealed class SqliteTrackyWorkspaceService(TrackyWorkspacePathProvider pathProvider) : ITrackyWorkspaceService
 {
     private static readonly string[] SeedLabels =
     [
@@ -18,20 +19,21 @@ public sealed class SqliteTrackyWorkspaceService : ITrackyWorkspaceService
         "priority:high",
     ];
 
-    private readonly TrackyWorkspacePathProvider _pathProvider;
-    private readonly IssueOverviewCalculator _overviewCalculator;
+    private static readonly string[] LabelColors =
+    [
+        "#2F81F7",
+        "#238636",
+        "#BF8700",
+        "#8957E5",
+        "#D1242F",
+        "#0E7490",
+    ];
+
+    private readonly TrackyWorkspacePathProvider _pathProvider = pathProvider;
 
     public SqliteTrackyWorkspaceService()
-        : this(new TrackyWorkspacePathProvider(), new IssueOverviewCalculator())
+        : this(new TrackyWorkspacePathProvider())
     {
-    }
-
-    public SqliteTrackyWorkspaceService(
-        TrackyWorkspacePathProvider pathProvider,
-        IssueOverviewCalculator overviewCalculator)
-    {
-        _pathProvider = pathProvider;
-        _overviewCalculator = overviewCalculator;
     }
 
     public async Task<WorkspaceOverview> GetOverviewAsync(CancellationToken cancellationToken = default)
@@ -39,7 +41,7 @@ public sealed class SqliteTrackyWorkspaceService : ITrackyWorkspaceService
         await using var connection = await OpenInitializedConnectionAsync(cancellationToken);
         var workspace = await GetWorkspaceAsync(connection, cancellationToken);
         var issues = await GetIssuesAsync(connection, cancellationToken);
-        var metrics = _overviewCalculator.Build(issues, DateOnly.FromDateTime(DateTime.Now));
+        var metrics = IssueOverviewCalculator.Build(issues, DateOnly.FromDateTime(DateTime.Now));
 
         return new WorkspaceOverview(
             workspace.Name,
@@ -156,6 +158,69 @@ public sealed class SqliteTrackyWorkspaceService : ITrackyWorkspaceService
         return (await GetIssueByIdAsync(connection, issueId, cancellationToken))!;
     }
 
+    public async Task<IssueListItem?> UpdateIssueAsync(
+        UpdateIssueInput input,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(input.Title);
+
+        await using var connection = await OpenInitializedConnectionAsync(cancellationToken);
+        await using var transaction = (SqliteTransaction)await connection.BeginTransactionAsync(cancellationToken);
+
+        var workspaceId = await GetWorkspaceIdForIssueAsync(connection, transaction, input.IssueId, cancellationToken);
+        if (workspaceId is null)
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            return null;
+        }
+
+        var now = DateTimeOffset.UtcNow;
+        var updateCommand = connection.CreateCommand();
+        updateCommand.Transaction = transaction;
+        updateCommand.CommandText =
+            """
+            UPDATE issues
+            SET title = $title,
+                description = $description,
+                priority = $priority,
+                assignee_display_name = $assignee,
+                due_date = $dueDate,
+                project_name = $projectName,
+                updated_utc = $updatedUtc
+            WHERE id = $id;
+            """;
+        updateCommand.Parameters.AddWithValue("$id", input.IssueId.ToString());
+        updateCommand.Parameters.AddWithValue("$title", input.Title.Trim());
+        updateCommand.Parameters.AddWithValue("$description", input.Description.Trim());
+        updateCommand.Parameters.AddWithValue("$priority", SerializePriority(input.Priority));
+        updateCommand.Parameters.AddWithValue("$assignee", (object?)Normalize(input.AssigneeDisplayName) ?? DBNull.Value);
+        updateCommand.Parameters.AddWithValue("$dueDate", (object?)SerializeDate(input.DueDate) ?? DBNull.Value);
+        updateCommand.Parameters.AddWithValue("$projectName", (object?)Normalize(input.ProjectName) ?? DBNull.Value);
+        updateCommand.Parameters.AddWithValue("$updatedUtc", SerializeTimestamp(now));
+
+        var affectedRows = await updateCommand.ExecuteNonQueryAsync(cancellationToken);
+        if (affectedRows == 0)
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            return null;
+        }
+
+        // Phase 1의 기본 CRUD는 메타데이터와 본문을 한 번에 편집하는 흐름이므로,
+        // 라벨 동기화와 활동 로그를 같은 트랜잭션 안에 묶어 상세 화면의 타임라인을 일관되게 유지한다.
+        await SyncLabelsAsync(connection, transaction, workspaceId, input.IssueId, input.Labels, cancellationToken);
+        await InsertActivityEventAsync(
+            connection,
+            transaction,
+            input.IssueId,
+            "issue.updated",
+            "Issue title, body, and metadata were updated.",
+            now,
+            cancellationToken);
+
+        await transaction.CommitAsync(cancellationToken);
+        return await GetIssueByIdAsync(connection, input.IssueId, cancellationToken);
+    }
+
     public async Task<IssueListItem?> UpdateIssueStateAsync(
         UpdateIssueStateInput input,
         CancellationToken cancellationToken = default)
@@ -164,9 +229,7 @@ public sealed class SqliteTrackyWorkspaceService : ITrackyWorkspaceService
         await using var transaction = (SqliteTransaction)await connection.BeginTransactionAsync(cancellationToken);
 
         var now = DateTimeOffset.UtcNow;
-        var normalizedReason = input.State == IssueWorkflowState.Open
-            ? IssueStateReason.None
-            : input.Reason;
+        var normalizedReason = NormalizeStateReason(input.State, input.Reason);
 
         var updateCommand = connection.CreateCommand();
         updateCommand.Transaction = transaction;
@@ -201,6 +264,27 @@ public sealed class SqliteTrackyWorkspaceService : ITrackyWorkspaceService
 
         await transaction.CommitAsync(cancellationToken);
         return await GetIssueByIdAsync(connection, input.IssueId, cancellationToken);
+    }
+
+    public async Task<bool> DeleteIssueAsync(Guid issueId, CancellationToken cancellationToken = default)
+    {
+        await using var connection = await OpenInitializedConnectionAsync(cancellationToken);
+        await using var transaction = (SqliteTransaction)await connection.BeginTransactionAsync(cancellationToken);
+
+        // 댓글, 첨부, 활동 로그는 FK cascade로 함께 정리해 Phase 1 삭제 흐름이
+        // 단일 SQLite 워크스페이스 파일 안에서 고아 데이터를 남기지 않도록 한다.
+        var deleteCommand = connection.CreateCommand();
+        deleteCommand.Transaction = transaction;
+        deleteCommand.CommandText =
+            """
+            DELETE FROM issues
+            WHERE id = $id;
+            """;
+        deleteCommand.Parameters.AddWithValue("$id", issueId.ToString());
+
+        var affectedRows = await deleteCommand.ExecuteNonQueryAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return affectedRows > 0;
     }
 
     public async Task<IssueComment?> AddIssueCommentAsync(
@@ -442,11 +526,11 @@ public sealed class SqliteTrackyWorkspaceService : ITrackyWorkspaceService
         await alterCommand.ExecuteNonQueryAsync(cancellationToken);
     }
 
-    private async Task SeedIfNeededAsync(SqliteConnection connection, CancellationToken cancellationToken)
+    private static async Task SeedIfNeededAsync(SqliteConnection connection, CancellationToken cancellationToken)
     {
         var countCommand = connection.CreateCommand();
         countCommand.CommandText = "SELECT COUNT(1) FROM workspaces;";
-        var workspaceCount = Convert.ToInt32(await countCommand.ExecuteScalarAsync(cancellationToken));
+        var workspaceCount = ReadScalarInt32(await countCommand.ExecuteScalarAsync(cancellationToken));
         if (workspaceCount > 0)
         {
             return;
@@ -732,7 +816,7 @@ public sealed class SqliteTrackyWorkspaceService : ITrackyWorkspaceService
         return issueId;
     }
 
-    private async Task<IssueComment> InsertCommentAsync(
+    private static async Task<IssueComment> InsertCommentAsync(
         SqliteConnection connection,
         SqliteTransaction transaction,
         Guid issueId,
@@ -769,7 +853,7 @@ public sealed class SqliteTrackyWorkspaceService : ITrackyWorkspaceService
         return new IssueComment(commentId, issueId, authorDisplayName, body, createdAtUtc);
     }
 
-    private async Task<IssueAttachment> InsertAttachmentAsync(
+    private static async Task<IssueAttachment> InsertAttachmentAsync(
         SqliteConnection connection,
         SqliteTransaction transaction,
         Guid issueId,
@@ -874,10 +958,10 @@ public sealed class SqliteTrackyWorkspaceService : ITrackyWorkspaceService
         var command = connection.CreateCommand();
         command.Transaction = transaction;
         command.CommandText = "SELECT COALESCE(MAX(issue_number), 100) + 1 FROM issues;";
-        return Convert.ToInt32(await command.ExecuteScalarAsync(cancellationToken));
+        return ReadScalarInt32(await command.ExecuteScalarAsync(cancellationToken));
     }
 
-    private async Task SyncLabelsAsync(
+    private static async Task SyncLabelsAsync(
         SqliteConnection connection,
         SqliteTransaction transaction,
         string workspaceId,
@@ -893,10 +977,11 @@ public sealed class SqliteTrackyWorkspaceService : ITrackyWorkspaceService
 
         foreach (var label in labels
             .Select(Normalize)
+            .OfType<string>()
             .Where(static label => !string.IsNullOrWhiteSpace(label))
-            .Distinct(StringComparer.OrdinalIgnoreCase)!)
+            .Distinct(StringComparer.OrdinalIgnoreCase))
         {
-            var labelId = await EnsureLabelAsync(connection, transaction, workspaceId, label!, cancellationToken);
+            var labelId = await EnsureLabelAsync(connection, transaction, workspaceId, label, cancellationToken);
 
             var linkCommand = connection.CreateCommand();
             linkCommand.Transaction = transaction;
@@ -957,18 +1042,10 @@ public sealed class SqliteTrackyWorkspaceService : ITrackyWorkspaceService
 
     private static string GetLabelColor(string labelName)
     {
-        var colors = new[]
-        {
-            "#2F81F7",
-            "#238636",
-            "#BF8700",
-            "#8957E5",
-            "#D1242F",
-            "#0E7490",
-        };
-
-        var index = Math.Abs(labelName.GetHashCode(StringComparison.OrdinalIgnoreCase)) % colors.Length;
-        return colors[index];
+        // 해시를 uint로 바꾸면 int.MinValue 같은 극단값도 예외 없이 팔레트 범위로 접을 수 있다.
+        var hash = (uint)StringComparer.OrdinalIgnoreCase.GetHashCode(labelName);
+        var index = (int)(hash % LabelColors.Length);
+        return LabelColors[index];
     }
 
     private static async Task InsertActivityEventAsync(
@@ -997,9 +1074,11 @@ public sealed class SqliteTrackyWorkspaceService : ITrackyWorkspaceService
 
     private static string BuildStateTransitionSummary(IssueWorkflowState state, IssueStateReason reason)
     {
+        var normalizedReason = NormalizeStateReason(state, reason);
+
         return state == IssueWorkflowState.Open
             ? "Issue was reopened for active work."
-            : reason switch
+            : normalizedReason switch
             {
                 IssueStateReason.Completed => "Issue was closed as completed.",
                 IssueStateReason.NotPlanned => "Issue was closed as not planned.",
@@ -1008,7 +1087,21 @@ public sealed class SqliteTrackyWorkspaceService : ITrackyWorkspaceService
             };
     }
 
-    private async Task<IReadOnlyList<IssueListItem>> GetIssuesAsync(
+    private static IssueStateReason NormalizeStateReason(IssueWorkflowState state, IssueStateReason reason)
+    {
+        // 닫힌 이슈가 reason:none으로 남으면 목록 필터와 타임라인 의미가 흐려지므로,
+        // Phase 1에서는 명시 사유가 비어 있을 때 completed를 안전한 기본값으로 사용한다.
+        if (state == IssueWorkflowState.Open)
+        {
+            return IssueStateReason.None;
+        }
+
+        return reason == IssueStateReason.None
+            ? IssueStateReason.Completed
+            : reason;
+    }
+
+    private static async Task<IReadOnlyList<IssueListItem>> GetIssuesAsync(
         SqliteConnection connection,
         CancellationToken cancellationToken)
     {
@@ -1057,8 +1150,8 @@ public sealed class SqliteTrackyWorkspaceService : ITrackyWorkspaceService
                     ParseReason(reader.GetString(4)),
                     ParsePriority(reader.GetString(5)),
                     reader.IsDBNull(6) ? null : reader.GetString(6),
-                    reader.IsDBNull(7) ? null : DateOnly.Parse(reader.GetString(7)),
-                    DateTimeOffset.Parse(reader.GetString(8)),
+                    reader.IsDBNull(7) ? null : ParseStoredDate(reader.GetString(7)),
+                    ParseStoredTimestamp(reader.GetString(8)),
                     reader.IsDBNull(9) ? null : reader.GetString(9),
                     reader.GetInt32(10),
                     reader.GetInt32(11));
@@ -1078,7 +1171,7 @@ public sealed class SqliteTrackyWorkspaceService : ITrackyWorkspaceService
         return items;
     }
 
-    private async Task<IssueListItem?> GetIssueByIdAsync(
+    private static async Task<IssueListItem?> GetIssueByIdAsync(
         SqliteConnection connection,
         Guid issueId,
         CancellationToken cancellationToken)
@@ -1102,7 +1195,27 @@ public sealed class SqliteTrackyWorkspaceService : ITrackyWorkspaceService
             WHERE id = $id;
             """;
         command.Parameters.AddWithValue("$id", issueId.ToString());
-        return Convert.ToInt32(await command.ExecuteScalarAsync(cancellationToken)) > 0;
+        return ReadScalarInt32(await command.ExecuteScalarAsync(cancellationToken)) > 0;
+    }
+
+    private static async Task<string?> GetWorkspaceIdForIssueAsync(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        Guid issueId,
+        CancellationToken cancellationToken)
+    {
+        var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText =
+            """
+            SELECT workspace_id
+            FROM issues
+            WHERE id = $id
+            LIMIT 1;
+            """;
+        command.Parameters.AddWithValue("$id", issueId.ToString());
+
+        return await command.ExecuteScalarAsync(cancellationToken) as string;
     }
 
     private static async Task<string> GetIssueDescriptionAsync(
@@ -1150,7 +1263,7 @@ public sealed class SqliteTrackyWorkspaceService : ITrackyWorkspaceService
                     Guid.Parse(reader.GetString(1)),
                     reader.GetString(2),
                     reader.GetString(3),
-                    DateTimeOffset.Parse(reader.GetString(4))));
+                    ParseStoredTimestamp(reader.GetString(4))));
         }
 
         return comments;
@@ -1183,7 +1296,7 @@ public sealed class SqliteTrackyWorkspaceService : ITrackyWorkspaceService
                     reader.GetString(2),
                     reader.GetString(3),
                     reader.GetInt64(4),
-                    DateTimeOffset.Parse(reader.GetString(5))));
+                    ParseStoredTimestamp(reader.GetString(5))));
         }
 
         return attachments;
@@ -1215,7 +1328,7 @@ public sealed class SqliteTrackyWorkspaceService : ITrackyWorkspaceService
                     Guid.Parse(reader.GetString(1)),
                     reader.GetString(2),
                     reader.GetString(3),
-                    DateTimeOffset.Parse(reader.GetString(4))));
+                    ParseStoredTimestamp(reader.GetString(4))));
         }
 
         return items;
@@ -1280,18 +1393,36 @@ public sealed class SqliteTrackyWorkspaceService : ITrackyWorkspaceService
 
     private static string? SerializeDate(DateOnly? date)
     {
-        return date?.ToString("yyyy-MM-dd");
+        return date?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
     }
 
     private static string SerializeTimestamp(DateTimeOffset timestamp)
     {
-        return timestamp.UtcDateTime.ToString("O");
+        return timestamp.UtcDateTime.ToString("O", CultureInfo.InvariantCulture);
+    }
+
+    private static int ReadScalarInt32(object? value)
+    {
+        // SQLite의 집계 결과는 boxed scalar로 돌아오므로, 변환 문화권을 고정해 Windows 로캘 차이를 차단한다.
+        return Convert.ToInt32(value, CultureInfo.InvariantCulture);
+    }
+
+    private static DateOnly ParseStoredDate(string value)
+    {
+        // 저장 포맷은 SerializeDate의 ISO 텍스트이며, 읽기 역시 invariant 규칙으로만 수행한다.
+        return DateOnly.Parse(value, CultureInfo.InvariantCulture);
+    }
+
+    private static DateTimeOffset ParseStoredTimestamp(string value)
+    {
+        // SerializeTimestamp가 UTC ISO-8601 텍스트를 쓰므로, 파싱도 같은 invariant 포맷으로 맞춘다.
+        return DateTimeOffset.Parse(value, CultureInfo.InvariantCulture);
     }
 
     private static string SanitizeFileName(string fileName)
     {
         var invalidCharacters = Path.GetInvalidFileNameChars();
-        var sanitized = new string(fileName.Select(character => invalidCharacters.Contains(character) ? '_' : character).ToArray());
+        var sanitized = new string([.. fileName.Select(character => invalidCharacters.Contains(character) ? '_' : character)]);
         return string.IsNullOrWhiteSpace(sanitized)
             ? "tracky-attachment.bin"
             : sanitized;
@@ -1299,59 +1430,43 @@ public sealed class SqliteTrackyWorkspaceService : ITrackyWorkspaceService
 
     private sealed record WorkspaceRow(string Id, string Name, string Description);
 
-    private sealed class IssueAccumulator
+    private sealed class IssueAccumulator(
+        Guid id,
+        int number,
+        string title,
+        IssueWorkflowState state,
+        IssueStateReason stateReason,
+        IssuePriority priority,
+        string? assigneeDisplayName,
+        DateOnly? dueDate,
+        DateTimeOffset updatedAtUtc,
+        string? projectName,
+        int commentCount,
+        int attachmentCount)
     {
-        public IssueAccumulator(
-            Guid id,
-            int number,
-            string title,
-            IssueWorkflowState state,
-            IssueStateReason stateReason,
-            IssuePriority priority,
-            string? assigneeDisplayName,
-            DateOnly? dueDate,
-            DateTimeOffset updatedAtUtc,
-            string? projectName,
-            int commentCount,
-            int attachmentCount)
-        {
-            Id = id;
-            Number = number;
-            Title = title;
-            State = state;
-            StateReason = stateReason;
-            Priority = priority;
-            AssigneeDisplayName = assigneeDisplayName;
-            DueDate = dueDate;
-            UpdatedAtUtc = updatedAtUtc;
-            ProjectName = projectName;
-            CommentCount = commentCount;
-            AttachmentCount = attachmentCount;
-        }
+        public Guid Id { get; } = id;
 
-        public Guid Id { get; }
+        public int Number { get; } = number;
 
-        public int Number { get; }
+        public string Title { get; } = title;
 
-        public string Title { get; }
+        public IssueWorkflowState State { get; } = state;
 
-        public IssueWorkflowState State { get; }
+        public IssueStateReason StateReason { get; } = stateReason;
 
-        public IssueStateReason StateReason { get; }
+        public IssuePriority Priority { get; } = priority;
 
-        public IssuePriority Priority { get; }
+        public string? AssigneeDisplayName { get; } = assigneeDisplayName;
 
-        public string? AssigneeDisplayName { get; }
+        public DateOnly? DueDate { get; } = dueDate;
 
-        public DateOnly? DueDate { get; }
+        public DateTimeOffset UpdatedAtUtc { get; } = updatedAtUtc;
 
-        public DateTimeOffset UpdatedAtUtc { get; }
+        public string? ProjectName { get; } = projectName;
 
-        public string? ProjectName { get; }
+        public int CommentCount { get; } = commentCount;
 
-        public int CommentCount { get; }
-
-        public int AttachmentCount { get; }
+        public int AttachmentCount { get; } = attachmentCount;
 
         public List<string> Labels { get; } = [];
 
@@ -1370,7 +1485,7 @@ public sealed class SqliteTrackyWorkspaceService : ITrackyWorkspaceService
                 ProjectName,
                 CommentCount,
                 AttachmentCount,
-                Labels.Count == 0 ? IssueListItem.EmptyLabels : Labels.ToArray());
+                Labels.Count == 0 ? IssueListItem.EmptyLabels : [.. Labels]);
         }
     }
 }

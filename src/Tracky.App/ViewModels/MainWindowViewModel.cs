@@ -1,16 +1,11 @@
 using System.Collections.ObjectModel;
-using System.IO;
-using System.Linq;
-using System.Threading;
 using Tracky.App.Services;
-using CommunityToolkit.Mvvm.ComponentModel;
-using CommunityToolkit.Mvvm.Input;
 using Tracky.Core.Issues;
 using Tracky.Core.Services;
 
 namespace Tracky.App.ViewModels;
 
-public partial class MainWindowViewModel : ViewModelBase
+public sealed class MainWindowViewModel : ViewModelBase, IDisposable
 {
     private readonly List<IssueCardViewModel> _allIssues = [];
     private readonly SemaphoreSlim _loadGate = new(1, 1);
@@ -19,6 +14,7 @@ public partial class MainWindowViewModel : ViewModelBase
     private readonly IAttachmentPicker _attachmentPicker;
     private readonly ITrackyWorkspaceService _workspaceService;
     private CancellationTokenSource? _detailLoadCts;
+    private bool _isDisposed;
 
     public MainWindowViewModel(
         ITrackyWorkspaceService workspaceService,
@@ -28,14 +24,72 @@ public partial class MainWindowViewModel : ViewModelBase
         _workspaceService = workspaceService;
         _attachmentPicker = attachmentPicker;
         _attachmentLauncher = attachmentLauncher;
+
+        ShowAllCommand = new RelayCommand(ShowAll);
+        ShowOpenCommand = new RelayCommand(ShowOpen);
+        ShowClosedCommand = new RelayCommand(ShowClosed);
+        RefreshCommand = new AsyncRelayCommand(RefreshAsync);
+        CreateIssueCommand = new AsyncRelayCommand(CreateIssueAsync, CanCreateIssue);
+        ToggleSelectedIssueStateCommand = new AsyncRelayCommand(ToggleSelectedIssueStateAsync, CanToggleSelectedIssueState);
+        UpdateSelectedIssueCommand = new AsyncRelayCommand(UpdateSelectedIssueAsync, CanUpdateSelectedIssue);
+        DeleteSelectedIssueCommand = new AsyncRelayCommand(DeleteSelectedIssueAsync, CanDeleteSelectedIssue);
+        AddCommentCommand = new AsyncRelayCommand(AddCommentAsync, CanAddComment);
+        AttachFileCommand = new AsyncRelayCommand(AttachFileAsync, CanAttachFile);
+        OpenAttachmentCommand = new AsyncRelayCommand<IssueAttachmentViewModel?>(OpenAttachmentAsync, CanOpenAttachment);
+
         DraftPriority = IssuePriority.High;
         DraftProjectName = "Tracky Foundation";
         DraftLabels = "foundation, desktop";
     }
 
+    public RelayCommand ShowAllCommand { get; }
+
+    public RelayCommand ShowOpenCommand { get; }
+
+    public RelayCommand ShowClosedCommand { get; }
+
+    public AsyncRelayCommand RefreshCommand { get; }
+
+    public AsyncRelayCommand CreateIssueCommand { get; }
+
+    public AsyncRelayCommand ToggleSelectedIssueStateCommand { get; }
+
+    public AsyncRelayCommand UpdateSelectedIssueCommand { get; }
+
+    public AsyncRelayCommand DeleteSelectedIssueCommand { get; }
+
+    public AsyncRelayCommand AddCommentCommand { get; }
+
+    public AsyncRelayCommand AttachFileCommand { get; }
+
+    public AsyncRelayCommand<IssueAttachmentViewModel?> OpenAttachmentCommand { get; }
+
+    public void Dispose()
+    {
+        if (_isDisposed)
+        {
+            return;
+        }
+
+        _isDisposed = true;
+
+        // ViewModel 수명이 끝날 때 진행 중인 상세 조회를 중단하고, 내부 동기화 리소스를 함께 해제한다.
+        _detailLoadCts?.Cancel();
+        _detailLoadCts?.Dispose();
+        _loadGate.Dispose();
+        _detailLoadGate.Dispose();
+    }
+
     public ObservableCollection<IssueCardViewModel> VisibleIssues { get; } = [];
 
     public IReadOnlyList<IssuePriority> AvailablePriorities { get; } = Enum.GetValues<IssuePriority>();
+
+    public IReadOnlyList<IssueStateReason> AvailableCloseReasons { get; } =
+    [
+        IssueStateReason.Completed,
+        IssueStateReason.NotPlanned,
+        IssueStateReason.Duplicate,
+    ];
 
     public bool IsAllScopeActive => ActiveScope == IssueFilterScope.All;
 
@@ -49,143 +103,365 @@ public partial class MainWindowViewModel : ViewModelBase
 
     public bool HasSelectedIssueDetail => SelectedIssueDetail is not null;
 
-    [ObservableProperty]
-    private string workspaceName = "Tracky";
+    public bool CanChooseCloseReason => SelectedIssue?.IsOpen == true;
 
-    [ObservableProperty]
-    private string workspaceDescription = "Preparing the local-first Phase 1 workspace.";
+    private string _workspaceName = "Tracky";
 
-    [ObservableProperty]
-    private string databasePath = string.Empty;
+    private string _workspaceDescription = "Preparing the local-first Phase 1 workspace.";
 
-    [ObservableProperty]
-    private string searchText = string.Empty;
+    private string _databasePath = string.Empty;
 
-    [ObservableProperty]
-    private IssueFilterScope activeScope = IssueFilterScope.All;
+    private string _searchText = string.Empty;
 
-    [ObservableProperty]
-    private IssueCardViewModel? selectedIssue;
+    private IssueFilterScope _activeScope = IssueFilterScope.All;
 
-    [ObservableProperty]
-    private IssueDetailViewModel? selectedIssueDetail;
+    private IssueCardViewModel? _selectedIssue;
 
-    [ObservableProperty]
-    private int totalIssues;
+    private IssueDetailViewModel? _selectedIssueDetail;
 
-    [ObservableProperty]
-    private int openIssues;
+    private int _totalIssues;
 
-    [ObservableProperty]
-    private int closedIssues;
+    private int _openIssues;
 
-    [ObservableProperty]
-    private int overdueIssues;
+    private int _closedIssues;
 
-    [ObservableProperty]
-    private int dueTodayIssues;
+    private int _overdueIssues;
 
-    [ObservableProperty]
-    private int upcomingIssues;
+    private int _dueTodayIssues;
 
-    [ObservableProperty]
-    private bool isBusy;
+    private int _upcomingIssues;
 
-    [ObservableProperty]
-    private bool isDetailBusy;
+    private bool _isBusy;
 
-    [ObservableProperty]
-    private string statusMessage = "Tracky is preparing the default workspace.";
+    private bool _isDetailBusy;
 
-    [ObservableProperty]
-    private string detailStatusMessage = "Select an issue to load its timeline, comments, and attachments.";
+    private string _statusMessage = "Tracky is preparing the default workspace.";
 
-    [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(CreateIssueCommand))]
-    private string draftTitle = string.Empty;
+    private string _detailStatusMessage = "Select an issue to load its timeline, comments, and attachments.";
 
-    [ObservableProperty]
-    private string draftAssignee = "Dabin";
+    private string _draftTitle = string.Empty;
 
-    [ObservableProperty]
-    private IssuePriority draftPriority;
+    private string _draftAssignee = "Dabin";
 
-    [ObservableProperty]
-    private DateTimeOffset? draftDueDate = DateTimeOffset.Now.AddDays(2);
+    private IssuePriority _draftPriority;
 
-    [ObservableProperty]
-    private string draftProjectName = string.Empty;
+    private DateTimeOffset? _draftDueDate = DateTimeOffset.Now.AddDays(2);
 
-    [ObservableProperty]
-    private string draftLabels = string.Empty;
+    private string _draftProjectName = string.Empty;
 
-    [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(AddCommentCommand))]
-    private string draftCommentAuthor = "Dabin";
+    private string _draftLabels = string.Empty;
 
-    [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(AddCommentCommand))]
-    private string draftCommentBody = string.Empty;
+    private string _draftCommentAuthor = "Dabin";
+
+    private string _draftCommentBody = string.Empty;
+
+    private string _editTitle = string.Empty;
+
+    private string _editDescription = string.Empty;
+
+    private string _editAssignee = string.Empty;
+
+    private IssuePriority _editPriority;
+
+    private DateTimeOffset? _editDueDate;
+
+    private string _editProjectName = string.Empty;
+
+    private string _editLabels = string.Empty;
+
+    private IssueStateReason _selectedCloseReason = IssueStateReason.Completed;
+
+    public string WorkspaceName
+    {
+        get => _workspaceName;
+        private set => SetProperty(ref _workspaceName, value);
+    }
+
+    public string WorkspaceDescription
+    {
+        get => _workspaceDescription;
+        private set => SetProperty(ref _workspaceDescription, value);
+    }
+
+    public string DatabasePath
+    {
+        get => _databasePath;
+        private set => SetProperty(ref _databasePath, value);
+    }
+
+    public string SearchText
+    {
+        get => _searchText;
+        set
+        {
+            if (SetProperty(ref _searchText, value))
+            {
+                ApplyFilters();
+            }
+        }
+    }
+
+    public IssueFilterScope ActiveScope
+    {
+        get => _activeScope;
+        private set
+        {
+            if (!SetProperty(ref _activeScope, value))
+            {
+                return;
+            }
+
+            OnPropertyChanged(nameof(IsAllScopeActive));
+            OnPropertyChanged(nameof(IsOpenScopeActive));
+            OnPropertyChanged(nameof(IsClosedScopeActive));
+            ApplyFilters();
+        }
+    }
+
+    public IssueCardViewModel? SelectedIssue
+    {
+        get => _selectedIssue;
+        set
+        {
+            if (!SetProperty(ref _selectedIssue, value))
+            {
+                return;
+            }
+
+            OnPropertyChanged(nameof(HasSelectedIssue));
+            OnPropertyChanged(nameof(HasNoSelectedIssue));
+            OnPropertyChanged(nameof(CanChooseCloseReason));
+            ToggleSelectedIssueStateCommand.NotifyCanExecuteChanged();
+            UpdateSelectedIssueCommand.NotifyCanExecuteChanged();
+            DeleteSelectedIssueCommand.NotifyCanExecuteChanged();
+            AddCommentCommand.NotifyCanExecuteChanged();
+            AttachFileCommand.NotifyCanExecuteChanged();
+            StartDetailLoad(value?.Id);
+        }
+    }
+
+    public IssueDetailViewModel? SelectedIssueDetail
+    {
+        get => _selectedIssueDetail;
+        private set
+        {
+            if (!SetProperty(ref _selectedIssueDetail, value))
+            {
+                return;
+            }
+
+            OnPropertyChanged(nameof(HasSelectedIssueDetail));
+            HydrateEditDraft(value);
+            UpdateSelectedIssueCommand.NotifyCanExecuteChanged();
+            OpenAttachmentCommand.NotifyCanExecuteChanged();
+        }
+    }
+
+    public int TotalIssues
+    {
+        get => _totalIssues;
+        private set => SetProperty(ref _totalIssues, value);
+    }
+
+    public int OpenIssues
+    {
+        get => _openIssues;
+        private set => SetProperty(ref _openIssues, value);
+    }
+
+    public int ClosedIssues
+    {
+        get => _closedIssues;
+        private set => SetProperty(ref _closedIssues, value);
+    }
+
+    public int OverdueIssues
+    {
+        get => _overdueIssues;
+        private set => SetProperty(ref _overdueIssues, value);
+    }
+
+    public int DueTodayIssues
+    {
+        get => _dueTodayIssues;
+        private set => SetProperty(ref _dueTodayIssues, value);
+    }
+
+    public int UpcomingIssues
+    {
+        get => _upcomingIssues;
+        private set => SetProperty(ref _upcomingIssues, value);
+    }
+
+    public bool IsBusy
+    {
+        get => _isBusy;
+        private set => SetProperty(ref _isBusy, value);
+    }
+
+    public bool IsDetailBusy
+    {
+        get => _isDetailBusy;
+        private set => SetProperty(ref _isDetailBusy, value);
+    }
+
+    public string StatusMessage
+    {
+        get => _statusMessage;
+        private set => SetProperty(ref _statusMessage, value);
+    }
+
+    public string DetailStatusMessage
+    {
+        get => _detailStatusMessage;
+        private set => SetProperty(ref _detailStatusMessage, value);
+    }
+
+    public string DraftTitle
+    {
+        get => _draftTitle;
+        set
+        {
+            if (SetProperty(ref _draftTitle, value))
+            {
+                CreateIssueCommand.NotifyCanExecuteChanged();
+            }
+        }
+    }
+
+    public string DraftAssignee
+    {
+        get => _draftAssignee;
+        set => SetProperty(ref _draftAssignee, value);
+    }
+
+    public IssuePriority DraftPriority
+    {
+        get => _draftPriority;
+        set => SetProperty(ref _draftPriority, value);
+    }
+
+    public DateTimeOffset? DraftDueDate
+    {
+        get => _draftDueDate;
+        set => SetProperty(ref _draftDueDate, value);
+    }
+
+    public string DraftProjectName
+    {
+        get => _draftProjectName;
+        set => SetProperty(ref _draftProjectName, value);
+    }
+
+    public string DraftLabels
+    {
+        get => _draftLabels;
+        set => SetProperty(ref _draftLabels, value);
+    }
+
+    public string DraftCommentAuthor
+    {
+        get => _draftCommentAuthor;
+        set
+        {
+            if (SetProperty(ref _draftCommentAuthor, value))
+            {
+                AddCommentCommand.NotifyCanExecuteChanged();
+            }
+        }
+    }
+
+    public string DraftCommentBody
+    {
+        get => _draftCommentBody;
+        set
+        {
+            if (SetProperty(ref _draftCommentBody, value))
+            {
+                AddCommentCommand.NotifyCanExecuteChanged();
+            }
+        }
+    }
+
+    public string EditTitle
+    {
+        get => _editTitle;
+        set
+        {
+            if (SetProperty(ref _editTitle, value))
+            {
+                UpdateSelectedIssueCommand.NotifyCanExecuteChanged();
+            }
+        }
+    }
+
+    public string EditDescription
+    {
+        get => _editDescription;
+        set => SetProperty(ref _editDescription, value);
+    }
+
+    public string EditAssignee
+    {
+        get => _editAssignee;
+        set => SetProperty(ref _editAssignee, value);
+    }
+
+    public IssuePriority EditPriority
+    {
+        get => _editPriority;
+        set => SetProperty(ref _editPriority, value);
+    }
+
+    public DateTimeOffset? EditDueDate
+    {
+        get => _editDueDate;
+        set => SetProperty(ref _editDueDate, value);
+    }
+
+    public string EditProjectName
+    {
+        get => _editProjectName;
+        set => SetProperty(ref _editProjectName, value);
+    }
+
+    public string EditLabels
+    {
+        get => _editLabels;
+        set => SetProperty(ref _editLabels, value);
+    }
+
+    public IssueStateReason SelectedCloseReason
+    {
+        get => _selectedCloseReason;
+        set => SetProperty(ref _selectedCloseReason, value);
+    }
 
     public Task InitializeAsync()
     {
         return LoadAsync();
     }
 
-    partial void OnSearchTextChanged(string value)
-    {
-        ApplyFilters();
-    }
-
-    partial void OnActiveScopeChanged(IssueFilterScope value)
-    {
-        OnPropertyChanged(nameof(IsAllScopeActive));
-        OnPropertyChanged(nameof(IsOpenScopeActive));
-        OnPropertyChanged(nameof(IsClosedScopeActive));
-        ApplyFilters();
-    }
-
-    partial void OnSelectedIssueChanged(IssueCardViewModel? value)
-    {
-        OnPropertyChanged(nameof(HasSelectedIssue));
-        OnPropertyChanged(nameof(HasNoSelectedIssue));
-        ToggleSelectedIssueStateCommand.NotifyCanExecuteChanged();
-        AddCommentCommand.NotifyCanExecuteChanged();
-        AttachFileCommand.NotifyCanExecuteChanged();
-        StartDetailLoad(value?.Id);
-    }
-
-    partial void OnSelectedIssueDetailChanged(IssueDetailViewModel? value)
-    {
-        OnPropertyChanged(nameof(HasSelectedIssueDetail));
-        OpenAttachmentCommand.NotifyCanExecuteChanged();
-    }
-
-    [RelayCommand]
     private void ShowAll()
     {
         ActiveScope = IssueFilterScope.All;
     }
 
-    [RelayCommand]
     private void ShowOpen()
     {
         ActiveScope = IssueFilterScope.Open;
     }
 
-    [RelayCommand]
     private void ShowClosed()
     {
         ActiveScope = IssueFilterScope.Closed;
     }
 
-    [RelayCommand]
     private async Task RefreshAsync(CancellationToken cancellationToken)
     {
         await LoadAsync(SelectedIssue?.Id, cancellationToken: cancellationToken);
     }
 
-    [RelayCommand(CanExecute = nameof(CanCreateIssue))]
     private async Task CreateIssueAsync(CancellationToken cancellationToken)
     {
         var createdIssue = await _workspaceService.CreateIssueAsync(
@@ -209,7 +485,6 @@ public partial class MainWindowViewModel : ViewModelBase
             cancellationToken);
     }
 
-    [RelayCommand(CanExecute = nameof(CanToggleSelectedIssueState))]
     private async Task ToggleSelectedIssueStateAsync(CancellationToken cancellationToken)
     {
         if (SelectedIssue is null)
@@ -217,30 +492,75 @@ public partial class MainWindowViewModel : ViewModelBase
             return;
         }
 
+        var issueId = SelectedIssue.Id;
         var nextState = SelectedIssue.IsOpen
             ? IssueWorkflowState.Closed
             : IssueWorkflowState.Open;
 
         var nextReason = nextState == IssueWorkflowState.Closed
-            ? IssueStateReason.Completed
+            ? NormalizeCloseReason(SelectedCloseReason)
             : IssueStateReason.None;
 
         var updatedIssue = await _workspaceService.UpdateIssueStateAsync(
             new UpdateIssueStateInput(
-                SelectedIssue.Id,
+                issueId,
                 nextState,
                 nextReason),
             cancellationToken);
 
         await LoadAsync(
-            updatedIssue?.Id ?? SelectedIssue.Id,
+            updatedIssue?.Id ?? issueId,
             updatedIssue is null
                 ? "The selected issue could not be updated."
-                : $"Issue #{updatedIssue.Number} is now {updatedIssue.State.ToString().ToLowerInvariant()}.",
+                : BuildStateUpdateStatus(updatedIssue),
             cancellationToken);
     }
 
-    [RelayCommand(CanExecute = nameof(CanAddComment))]
+    private async Task UpdateSelectedIssueAsync(CancellationToken cancellationToken)
+    {
+        if (SelectedIssue is null)
+        {
+            return;
+        }
+
+        var issueId = SelectedIssue.Id;
+        var updatedIssue = await _workspaceService.UpdateIssueAsync(
+            new UpdateIssueInput(
+                issueId,
+                EditTitle,
+                EditDescription,
+                EditAssignee,
+                EditPriority,
+                EditDueDate is null ? null : DateOnly.FromDateTime(EditDueDate.Value.Date),
+                EditProjectName,
+                ParseLabels(EditLabels)),
+            cancellationToken);
+
+        await LoadAsync(
+            updatedIssue?.Id ?? issueId,
+            updatedIssue is null
+                ? "The selected issue could not be saved because it was not found."
+                : $"Issue #{updatedIssue.Number} was saved with updated Phase 1 metadata.",
+            cancellationToken);
+    }
+
+    private async Task DeleteSelectedIssueAsync(CancellationToken cancellationToken)
+    {
+        if (SelectedIssue is null)
+        {
+            return;
+        }
+
+        var issueId = SelectedIssue.Id;
+        var deletedIssueNumber = SelectedIssue.Number;
+        var deleted = await _workspaceService.DeleteIssueAsync(issueId, cancellationToken);
+        await LoadAsync(
+            completionMessage: deleted
+                ? $"Issue #{deletedIssueNumber} was deleted from the local workspace."
+                : "The selected issue could not be deleted because it was not found.",
+            cancellationToken: cancellationToken);
+    }
+
     private async Task AddCommentAsync(CancellationToken cancellationToken)
     {
         if (SelectedIssue is null)
@@ -248,9 +568,10 @@ public partial class MainWindowViewModel : ViewModelBase
             return;
         }
 
+        var issueId = SelectedIssue.Id;
         var comment = await _workspaceService.AddIssueCommentAsync(
             new AddIssueCommentInput(
-                SelectedIssue.Id,
+                issueId,
                 DraftCommentAuthor,
                 DraftCommentBody),
             cancellationToken);
@@ -263,12 +584,11 @@ public partial class MainWindowViewModel : ViewModelBase
 
         DraftCommentBody = string.Empty;
         await LoadAsync(
-            SelectedIssue.Id,
+            issueId,
             "The selected issue was refreshed after saving the new comment.",
             cancellationToken);
     }
 
-    [RelayCommand(CanExecute = nameof(CanAttachFile))]
     private async Task AttachFileAsync(CancellationToken cancellationToken)
     {
         if (SelectedIssue is null)
@@ -276,6 +596,7 @@ public partial class MainWindowViewModel : ViewModelBase
             return;
         }
 
+        var issueId = SelectedIssue.Id;
         var path = await _attachmentPicker.PickAttachmentAsync();
         if (string.IsNullOrWhiteSpace(path))
         {
@@ -286,7 +607,7 @@ public partial class MainWindowViewModel : ViewModelBase
         var content = await File.ReadAllBytesAsync(path, cancellationToken);
         var attachment = await _workspaceService.AddIssueAttachmentAsync(
             new AddIssueAttachmentInput(
-                SelectedIssue.Id,
+                issueId,
                 Path.GetFileName(path),
                 GuessContentType(path),
                 content),
@@ -299,12 +620,11 @@ public partial class MainWindowViewModel : ViewModelBase
         }
 
         await LoadAsync(
-            SelectedIssue.Id,
+            issueId,
             $"Attachment \"{attachment.FileName}\" was added to the selected issue.",
             cancellationToken);
     }
 
-    [RelayCommand(CanExecute = nameof(CanOpenAttachment))]
     private async Task OpenAttachmentAsync(IssueAttachmentViewModel? attachment, CancellationToken cancellationToken)
     {
         if (attachment is null)
@@ -329,6 +649,20 @@ public partial class MainWindowViewModel : ViewModelBase
     }
 
     private bool CanToggleSelectedIssueState()
+    {
+        return !IsBusy && SelectedIssue is not null;
+    }
+
+    private bool CanUpdateSelectedIssue()
+    {
+        return !IsBusy
+            && !IsDetailBusy
+            && SelectedIssue is not null
+            && SelectedIssueDetail is not null
+            && !string.IsNullOrWhiteSpace(EditTitle);
+    }
+
+    private bool CanDeleteSelectedIssue()
     {
         return !IsBusy && SelectedIssue is not null;
     }
@@ -364,6 +698,8 @@ public partial class MainWindowViewModel : ViewModelBase
             IsBusy = true;
             CreateIssueCommand.NotifyCanExecuteChanged();
             ToggleSelectedIssueStateCommand.NotifyCanExecuteChanged();
+            UpdateSelectedIssueCommand.NotifyCanExecuteChanged();
+            DeleteSelectedIssueCommand.NotifyCanExecuteChanged();
             AddCommentCommand.NotifyCanExecuteChanged();
             AttachFileCommand.NotifyCanExecuteChanged();
             OpenAttachmentCommand.NotifyCanExecuteChanged();
@@ -400,6 +736,8 @@ public partial class MainWindowViewModel : ViewModelBase
             IsBusy = false;
             CreateIssueCommand.NotifyCanExecuteChanged();
             ToggleSelectedIssueStateCommand.NotifyCanExecuteChanged();
+            UpdateSelectedIssueCommand.NotifyCanExecuteChanged();
+            DeleteSelectedIssueCommand.NotifyCanExecuteChanged();
             AddCommentCommand.NotifyCanExecuteChanged();
             AttachFileCommand.NotifyCanExecuteChanged();
             OpenAttachmentCommand.NotifyCanExecuteChanged();
@@ -420,6 +758,7 @@ public partial class MainWindowViewModel : ViewModelBase
             return;
         }
 
+        SelectedIssueDetail = null;
         var cancellationSource = new CancellationTokenSource();
         _detailLoadCts = cancellationSource;
         _ = LoadIssueDetailAsync(issueId.Value, cancellationSource.Token);
@@ -432,6 +771,7 @@ public partial class MainWindowViewModel : ViewModelBase
         try
         {
             IsDetailBusy = true;
+            UpdateSelectedIssueCommand.NotifyCanExecuteChanged();
             AddCommentCommand.NotifyCanExecuteChanged();
             AttachFileCommand.NotifyCanExecuteChanged();
             OpenAttachmentCommand.NotifyCanExecuteChanged();
@@ -462,6 +802,7 @@ public partial class MainWindowViewModel : ViewModelBase
         finally
         {
             IsDetailBusy = false;
+            UpdateSelectedIssueCommand.NotifyCanExecuteChanged();
             AddCommentCommand.NotifyCanExecuteChanged();
             AttachFileCommand.NotifyCanExecuteChanged();
             OpenAttachmentCommand.NotifyCanExecuteChanged();
@@ -486,6 +827,38 @@ public partial class MainWindowViewModel : ViewModelBase
         SelectedIssue = SelectPreferredIssue(filteredIssues, preferredIssueId);
     }
 
+    private void HydrateEditDraft(IssueDetailViewModel? detail)
+    {
+        // 선택한 상세 이슈가 바뀔 때 편집 초안을 즉시 재구성해야,
+        // 저장 버튼이 이전 이슈의 메타데이터를 실수로 다시 쓰지 않는다.
+        if (detail is null)
+        {
+            EditTitle = string.Empty;
+            EditDescription = string.Empty;
+            EditAssignee = string.Empty;
+            EditPriority = IssuePriority.None;
+            EditDueDate = null;
+            EditProjectName = string.Empty;
+            EditLabels = string.Empty;
+            SelectedCloseReason = IssueStateReason.Completed;
+            return;
+        }
+
+        var summary = detail.Summary.Issue;
+        EditTitle = summary.Title;
+        EditDescription = detail.Detail.Description;
+        EditAssignee = summary.AssigneeDisplayName ?? string.Empty;
+        EditPriority = summary.Priority;
+        EditDueDate = summary.DueDate is null
+            ? null
+            : new DateTimeOffset(summary.DueDate.Value.ToDateTime(TimeOnly.MinValue));
+        EditProjectName = summary.ProjectName ?? string.Empty;
+        EditLabels = string.Join(", ", summary.Labels);
+        SelectedCloseReason = summary.StateReason == IssueStateReason.None
+            ? IssueStateReason.Completed
+            : summary.StateReason;
+    }
+
     private static bool MatchesScope(IssueCardViewModel issue, IssueFilterScope scope) => scope switch
     {
         IssueFilterScope.Open => issue.IsOpen,
@@ -508,7 +881,7 @@ public partial class MainWindowViewModel : ViewModelBase
     }
 
     private IssueCardViewModel? SelectPreferredIssue(
-        IReadOnlyList<IssueCardViewModel> filteredIssues,
+        List<IssueCardViewModel> filteredIssues,
         Guid? preferredIssueId)
     {
         if (filteredIssues.Count == 0)
@@ -531,12 +904,11 @@ public partial class MainWindowViewModel : ViewModelBase
         return filteredIssues[0];
     }
 
-    private static IReadOnlyList<string> ParseLabels(string rawLabels)
+    private static string[] ParseLabels(string rawLabels)
     {
-        return rawLabels
+        return [.. rawLabels
             .Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToArray();
+            .Distinct(StringComparer.OrdinalIgnoreCase)];
     }
 
     private static string GuessContentType(string path)
@@ -553,4 +925,29 @@ public partial class MainWindowViewModel : ViewModelBase
             _ => "application/octet-stream",
         };
     }
+
+    private static IssueStateReason NormalizeCloseReason(IssueStateReason reason)
+    {
+        return reason == IssueStateReason.None
+            ? IssueStateReason.Completed
+            : reason;
+    }
+
+    private static string BuildStateUpdateStatus(IssueListItem issue)
+    {
+        if (issue.State == IssueWorkflowState.Open)
+        {
+            return $"Issue #{issue.Number} was reopened.";
+        }
+
+        return $"Issue #{issue.Number} was closed as {FormatStateReason(issue.StateReason)}.";
+    }
+
+    private static string FormatStateReason(IssueStateReason reason) => reason switch
+    {
+        IssueStateReason.Completed => "completed",
+        IssueStateReason.NotPlanned => "not planned",
+        IssueStateReason.Duplicate => "duplicate",
+        _ => "completed",
+    };
 }

@@ -1,0 +1,33 @@
+<Project>
+  <PropertyGroup>
+    <!--
+      모든 프로젝트가 같은 경고 기준을 공유하도록 중앙화한다.
+      TreatWarningsAsErrors를 켜 두면 Phase 1 이후 기능을 추가할 때도 0-warning 상태가 깨지는 즉시 빌드가 실패한다.
+    -->
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <WarningLevel>9999</WarningLevel>
+    <AnalysisLevel>latest</AnalysisLevel>
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <AnalysisMode>Recommended</AnalysisMode>
+    <Deterministic>true</Deterministic>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <!--
+      .NET SDK의 C# 컴파일러 최적화는 단계형 숫자가 아니라 켜짐/꺼짐 모델이다.
+      Release에서는 컴파일러 최적화와 런타임 tiered PGO를 명시해 현재 프로젝트에서 사용할 수 있는 가장 강한 기본 최적화 경로를 고정한다.
+    -->
+    <Optimize>true</Optimize>
+    <TieredCompilation>true</TieredCompilation>
+    <TieredPGO>true</TieredPGO>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'Tracky.Core.Tests' Or '$(MSBuildProjectName)' == 'Tracky.App.Tests'">
+    <!--
+      테스트 메서드는 시나리오가 바로 읽히도록 문장형 이름을 유지한다.
+      제품 코드의 명명 규칙은 그대로 두고, xUnit 테스트 프로젝트에만 CA1707 예외를 제한한다.
+    -->
+    <NoWarn>$(NoWarn);CA1707</NoWarn>
+  </PropertyGroup>
+</Project>

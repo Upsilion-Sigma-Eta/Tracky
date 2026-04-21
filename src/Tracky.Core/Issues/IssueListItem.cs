@@ -15,5 +15,5 @@ public sealed record IssueListItem(
     int AttachmentCount,
     IReadOnlyList<string> Labels)
 {
-    public static readonly IReadOnlyList<string> EmptyLabels = Array.Empty<string>();
+    public static readonly IReadOnlyList<string> EmptyLabels = [];
 }

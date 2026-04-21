@@ -11,7 +11,11 @@ public interface ITrackyWorkspaceService
 
     Task<IssueListItem> CreateIssueAsync(CreateIssueInput input, CancellationToken cancellationToken = default);
 
+    Task<IssueListItem?> UpdateIssueAsync(UpdateIssueInput input, CancellationToken cancellationToken = default);
+
     Task<IssueListItem?> UpdateIssueStateAsync(UpdateIssueStateInput input, CancellationToken cancellationToken = default);
+
+    Task<bool> DeleteIssueAsync(Guid issueId, CancellationToken cancellationToken = default);
 
     Task<IssueComment?> AddIssueCommentAsync(AddIssueCommentInput input, CancellationToken cancellationToken = default);
 
