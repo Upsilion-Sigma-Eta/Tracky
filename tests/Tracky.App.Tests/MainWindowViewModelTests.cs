@@ -1,6 +1,7 @@
 using Tracky.App.Tests.TestDoubles;
 using Tracky.App.ViewModels;
 using Tracky.Core.Issues;
+using Tracky.Core.Projects;
 
 namespace Tracky.App.Tests;
 
@@ -87,6 +88,112 @@ public sealed class MainWindowViewModelTests
         Assert.Equal("Write a broader GUI regression suite", viewModel.SelectedIssue!.Title);
         Assert.Equal(IssuePriority.Critical, viewModel.SelectedIssue.Issue.Priority);
         Assert.Contains("Issue #", viewModel.StatusMessage, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task Project_screen_loads_phase2_views_and_updates_project_metadata()
+    {
+        var viewModel = CreateViewModel(out _, out _);
+
+        await viewModel.InitializeAsync();
+        viewModel.DraftProjectName = "Tracky Foundation";
+        viewModel.DraftTitle = "Critical project sorting check";
+        viewModel.DraftPriority = IssuePriority.Critical;
+        viewModel.DraftDueDate = DateTimeOffset.Now.AddDays(1);
+        await viewModel.CreateIssueCommand.ExecuteAsync();
+        viewModel.DraftTitle = "Low project sorting check";
+        viewModel.DraftPriority = IssuePriority.Low;
+        viewModel.DraftDueDate = DateTimeOffset.Now.AddDays(5);
+        await viewModel.CreateIssueCommand.ExecuteAsync();
+
+        viewModel.ShowProjectsCommand.Execute(null);
+        await TestWaiter.UntilAsync(
+            () => viewModel.SelectedProject is not null && viewModel.ProjectBoardColumns.Count > 0,
+            "The Projects screen did not load a selected project with board columns.");
+
+        Assert.True(viewModel.IsProjectsViewActive);
+        Assert.False(viewModel.IsIssuesViewActive);
+        Assert.NotEmpty(viewModel.Projects);
+        Assert.NotEmpty(viewModel.ProjectTableItems);
+        Assert.NotEmpty(viewModel.ProjectCustomFields);
+        Assert.NotEmpty(viewModel.ProjectSavedViews);
+
+        viewModel.ProjectSortText = "Priority";
+        viewModel.ProjectGroupByText = "Priority";
+        Assert.Equal(IssuePriority.Critical, viewModel.ProjectTableItems.First().Item.Priority);
+        Assert.Equal("Critical", viewModel.ProjectTableGroups.First().Name);
+        Assert.Contains(viewModel.ProjectTableGroups, group => group.Name == "Low");
+
+        var movableItem = viewModel.ProjectBoardColumns
+            .SelectMany(column => column.Items)
+            .First(item => item.HasNextColumn);
+        await viewModel.MoveProjectItemForwardCommand.ExecuteAsync(movableItem);
+        await TestWaiter.UntilAsync(
+            () => viewModel.ProjectBoardColumns
+                .Any(column => column.Name == movableItem.NextBoardColumn
+                    && column.Items.Any(item => item.ProjectItemId == movableItem.ProjectItemId)),
+            "The project board item was not moved to the next Phase 2 column.");
+
+        viewModel.DraftCustomFieldName = "Impact";
+        viewModel.DraftCustomFieldType = ProjectCustomFieldType.SingleSelect;
+        viewModel.DraftCustomFieldOptions = "Low, Medium, High";
+        await viewModel.AddProjectCustomFieldCommand.ExecuteAsync();
+        await TestWaiter.UntilAsync(
+            () => viewModel.ProjectCustomFields.Any(field => field.Name == "Impact"),
+            "The custom field command did not refresh the selected project detail.");
+
+        var impactField = viewModel.ProjectCustomFields.Single(field => field.Name == "Impact");
+        var fieldItem = viewModel.ProjectTableItems.First();
+        viewModel.SelectedProjectItemForFields = fieldItem;
+        viewModel.SelectedProjectCustomField = impactField;
+        viewModel.DraftCustomFieldValue = "High";
+        await viewModel.SaveProjectCustomFieldValueCommand.ExecuteAsync();
+        await TestWaiter.UntilAsync(
+            () => viewModel.ProjectTableItems.Any(
+                item => item.ProjectItemId == fieldItem.ProjectItemId
+                    && item.Item.CustomFieldValues.TryGetValue("Impact", out var value)
+                    && value == "High"),
+            "The custom field value command did not refresh the selected project item.");
+
+        viewModel.DraftSavedViewName = "High impact board";
+        viewModel.DraftSavedViewMode = ProjectViewMode.Board;
+        viewModel.DraftSavedViewFilter = "impact:high";
+        viewModel.DraftSavedViewSort = "Priority";
+        viewModel.DraftSavedViewGroup = "Status";
+        await viewModel.AddProjectSavedViewCommand.ExecuteAsync();
+        await TestWaiter.UntilAsync(
+            () => viewModel.ProjectSavedViews.Any(view => view.Name == "High impact board"),
+            "The saved view command did not refresh the selected project detail.");
+
+        var highImpactView = viewModel.ProjectSavedViews.Single(view => view.Name == "High impact board");
+        await viewModel.ApplyProjectSavedViewCommand.ExecuteAsync(highImpactView);
+
+        Assert.True(viewModel.IsProjectBoardViewActive);
+        Assert.Equal("impact:high", viewModel.ProjectFilterText);
+        Assert.Equal("Priority", viewModel.ProjectSortText);
+        Assert.Equal("Status", viewModel.ProjectGroupByText);
+        Assert.All(viewModel.ProjectTableGroups, group => Assert.False(string.IsNullOrWhiteSpace(group.Name)));
+        Assert.All(
+            viewModel.ProjectTableItems,
+            item => Assert.True(item.Item.CustomFieldValues.TryGetValue("Impact", out var value) && value == "High"));
+    }
+
+    [Fact]
+    public async Task Create_project_selects_the_new_project_shell()
+    {
+        var viewModel = CreateViewModel(out _, out _);
+        await viewModel.InitializeAsync();
+
+        viewModel.NewProjectName = "Tracky Reports";
+        viewModel.NewProjectDescription = "Report planning for later phases.";
+        await viewModel.CreateProjectCommand.ExecuteAsync();
+        await TestWaiter.UntilAsync(
+            () => viewModel.SelectedProject?.Name == "Tracky Reports",
+            "The newly created project was not selected after project creation.");
+
+        Assert.True(viewModel.IsProjectsViewActive);
+        Assert.Contains(viewModel.Projects, project => project.Name == "Tracky Reports");
+        Assert.Equal(0, viewModel.SelectedProject!.TotalIssues);
     }
 
     [Fact]

@@ -1,4 +1,5 @@
 using Tracky.Core.Issues;
+using Tracky.Core.Projects;
 using Tracky.Core.Services;
 using Tracky.Core.Workspaces;
 
@@ -9,8 +10,17 @@ public sealed class TestTrackyWorkspaceService : ITrackyWorkspaceService
     private readonly Dictionary<Guid, byte[]> _attachmentContentById = [];
     private readonly Dictionary<Guid, List<IssueActivityEntry>> _activityByIssueId = [];
     private readonly Dictionary<Guid, List<IssueAttachment>> _attachmentsByIssueId = [];
+    private readonly Dictionary<Guid, List<ProjectCustomField>> _customFieldsByProjectId = [];
+    private readonly Dictionary<Guid, Dictionary<string, string>> _customFieldValuesByProjectItemId = [];
     private readonly Dictionary<Guid, List<IssueComment>> _commentsByIssueId = [];
     private readonly Dictionary<Guid, string> _descriptionByIssueId = [];
+    private readonly Dictionary<Guid, string> _projectDescriptionById = [];
+    private readonly Dictionary<Guid, (Guid ProjectId, Guid IssueId)> _projectItemLocationById = [];
+    private readonly Dictionary<(Guid ProjectId, Guid IssueId), Guid> _projectItemIdByIssue = [];
+    private readonly Dictionary<Guid, string> _projectNameById = [];
+    private readonly Dictionary<string, Guid> _projectIdByName = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<Guid, List<ProjectSavedView>> _savedViewsByProjectId = [];
+    private readonly Dictionary<Guid, string> _boardColumnByProjectItemId = [];
     private readonly List<IssueListItem> _issues = [];
 
     private TestTrackyWorkspaceService()
@@ -55,6 +65,9 @@ public sealed class TestTrackyWorkspaceService : ITrackyWorkspaceService
                 0,
                 0,
                 ["tests"]));
+
+        service.EnsureProject("Tracky Foundation", "Default project used by Phase 2 board tests.");
+        service.EnsureProject("Tracky Tests", "Closed issue project used by filtering tests.");
 
         service._descriptionByIssueId[openIssueId] = "Open issue description for the right-side detail panel.";
         service._descriptionByIssueId[closedIssueId] = "Closed issue description for filter verification.";
@@ -151,6 +164,11 @@ public sealed class TestTrackyWorkspaceService : ITrackyWorkspaceService
             [.. input.Labels]);
 
         _issues.Add(issue);
+        if (!string.IsNullOrWhiteSpace(issue.ProjectName))
+        {
+            EnsureProject(issue.ProjectName, $"Issues grouped under {issue.ProjectName}.");
+        }
+
         _descriptionByIssueId[issue.Id] = "Created by the quick capture flow.";
         _commentsByIssueId[issue.Id] = [];
         _attachmentsByIssueId[issue.Id] = [];
@@ -194,6 +212,11 @@ public sealed class TestTrackyWorkspaceService : ITrackyWorkspaceService
         // 테스트 더블도 프로덕션 서비스처럼 본문/라벨/메타데이터를 함께 갱신해야
         // ViewModel 테스트가 실제 Phase 1 편집 흐름과 같은 계약을 검증한다.
         _issues[index] = updatedIssue;
+        if (!string.IsNullOrWhiteSpace(updatedIssue.ProjectName))
+        {
+            EnsureProject(updatedIssue.ProjectName, $"Issues grouped under {updatedIssue.ProjectName}.");
+        }
+
         _descriptionByIssueId[input.IssueId] = input.Description.Trim();
         AddActivity(input.IssueId, "issue.updated", "Issue title, body, and metadata were updated.");
         return Task.FromResult<IssueListItem?>(updatedIssue);
@@ -215,6 +238,15 @@ public sealed class TestTrackyWorkspaceService : ITrackyWorkspaceService
             UpdatedAtUtc = DateTimeOffset.UtcNow,
         };
         _issues[index] = updatedIssue;
+        foreach (var projectItemId in _projectItemLocationById
+            .Where(pair => pair.Value.IssueId == input.IssueId)
+            .Select(static pair => pair.Key))
+        {
+            _boardColumnByProjectItemId[projectItemId] = input.State == IssueWorkflowState.Closed
+                ? "Done"
+                : "To do";
+        }
+
         AddActivity(input.IssueId, "issue.state.changed", BuildStateSummary(input.State, reason));
         return Task.FromResult<IssueListItem?>(updatedIssue);
     }
@@ -239,6 +271,17 @@ public sealed class TestTrackyWorkspaceService : ITrackyWorkspaceService
         _commentsByIssueId.Remove(issueId);
         _attachmentsByIssueId.Remove(issueId);
         _activityByIssueId.Remove(issueId);
+
+        foreach (var projectItem in _projectItemLocationById
+            .Where(pair => pair.Value.IssueId == issueId)
+            .ToArray())
+        {
+            _projectItemLocationById.Remove(projectItem.Key);
+            _boardColumnByProjectItemId.Remove(projectItem.Key);
+            _customFieldValuesByProjectItemId.Remove(projectItem.Key);
+            _projectItemIdByIssue.Remove((projectItem.Value.ProjectId, issueId));
+        }
+
         return Task.FromResult(true);
     }
 
@@ -302,6 +345,308 @@ public sealed class TestTrackyWorkspaceService : ITrackyWorkspaceService
         var path = Path.Combine(Path.GetTempPath(), $"tracky-test-{attachmentId:N}.bin");
         await File.WriteAllBytesAsync(path, content, cancellationToken);
         return path;
+    }
+
+    public Task<IReadOnlyList<ProjectSummary>> GetProjectsAsync(CancellationToken cancellationToken = default)
+    {
+        EnsureProjectsFromIssues();
+        return Task.FromResult<IReadOnlyList<ProjectSummary>>(
+            [.. _projectNameById.Keys
+                .Select(BuildProjectSummary)
+                .OrderBy(static project => project.Name)]);
+    }
+
+    public Task<ProjectDetail?> GetProjectDetailAsync(Guid projectId, CancellationToken cancellationToken = default)
+    {
+        EnsureProjectsFromIssues();
+        if (!_projectNameById.TryGetValue(projectId, out var projectName))
+        {
+            return Task.FromResult<ProjectDetail?>(null);
+        }
+
+        EnsureProjectMetadata(projectId);
+        var summary = BuildProjectSummary(projectId);
+        var items = _issues
+            .Where(issue => string.Equals(issue.ProjectName, projectName, StringComparison.OrdinalIgnoreCase))
+            .Select(issue => BuildProjectIssueItem(projectId, issue))
+            .OrderBy(static item => item.SortOrder)
+            .ThenBy(static item => item.IssueNumber)
+            .ToArray();
+        var boardColumns = new[]
+        {
+            BuildProjectBoardColumn("To do", items),
+            BuildProjectBoardColumn("In progress", items),
+            BuildProjectBoardColumn("Done", items),
+        };
+        var detail = new ProjectDetail(
+            summary,
+            boardColumns,
+            [.. items.OrderBy(static item => item.IssueNumber)],
+            [.. items.Where(static item => item.DueDate is not null).OrderBy(static item => item.DueDate)],
+            [.. items.OrderBy(static item => item.DueDate ?? DateOnly.MaxValue)],
+            [.. _customFieldsByProjectId[projectId]],
+            [.. _savedViewsByProjectId[projectId]]);
+
+        return Task.FromResult<ProjectDetail?>(detail);
+    }
+
+    public Task<ProjectSummary> CreateProjectAsync(
+        CreateProjectInput input,
+        CancellationToken cancellationToken = default)
+    {
+        var projectId = EnsureProject(input.Name.Trim(), input.Description.Trim());
+        return Task.FromResult(BuildProjectSummary(projectId));
+    }
+
+    public Task<ProjectIssueItem?> MoveProjectItemAsync(
+        MoveProjectItemInput input,
+        CancellationToken cancellationToken = default)
+    {
+        if (!_projectItemLocationById.TryGetValue(input.ProjectItemId, out var location))
+        {
+            return Task.FromResult<ProjectIssueItem?>(null);
+        }
+
+        var issue = _issues.FirstOrDefault(item => item.Id == location.IssueId);
+        if (issue is null)
+        {
+            return Task.FromResult<ProjectIssueItem?>(null);
+        }
+
+        _boardColumnByProjectItemId[input.ProjectItemId] = input.BoardColumn.Trim();
+        return Task.FromResult<ProjectIssueItem?>(BuildProjectIssueItem(location.ProjectId, issue));
+    }
+
+    public Task<ProjectCustomField?> AddProjectCustomFieldAsync(
+        AddProjectCustomFieldInput input,
+        CancellationToken cancellationToken = default)
+    {
+        if (!_projectNameById.ContainsKey(input.ProjectId))
+        {
+            return Task.FromResult<ProjectCustomField?>(null);
+        }
+
+        EnsureProjectMetadata(input.ProjectId);
+        var fields = _customFieldsByProjectId[input.ProjectId];
+        fields.RemoveAll(field => string.Equals(field.Name, input.Name.Trim(), StringComparison.OrdinalIgnoreCase));
+
+        var field = new ProjectCustomField(
+            Guid.NewGuid(),
+            input.ProjectId,
+            input.Name.Trim(),
+            input.FieldType,
+            input.OptionsText.Trim());
+        fields.Add(field);
+        return Task.FromResult<ProjectCustomField?>(field);
+    }
+
+    public Task<ProjectIssueItem?> UpdateProjectCustomFieldValueAsync(
+        UpdateProjectCustomFieldValueInput input,
+        CancellationToken cancellationToken = default)
+    {
+        if (!_projectItemLocationById.TryGetValue(input.ProjectItemId, out var location)
+            || !_customFieldsByProjectId.TryGetValue(location.ProjectId, out var fields))
+        {
+            return Task.FromResult<ProjectIssueItem?>(null);
+        }
+
+        var field = fields.FirstOrDefault(item => item.Id == input.CustomFieldId);
+        var issue = _issues.FirstOrDefault(item => item.Id == location.IssueId);
+        if (field is null || issue is null)
+        {
+            return Task.FromResult<ProjectIssueItem?>(null);
+        }
+
+        if (!_customFieldValuesByProjectItemId.TryGetValue(input.ProjectItemId, out var values))
+        {
+            values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            _customFieldValuesByProjectItemId[input.ProjectItemId] = values;
+        }
+
+        values[field.Name] = input.ValueText.Trim();
+        return Task.FromResult<ProjectIssueItem?>(BuildProjectIssueItem(location.ProjectId, issue));
+    }
+
+    public Task<ProjectSavedView?> AddProjectSavedViewAsync(
+        AddProjectSavedViewInput input,
+        CancellationToken cancellationToken = default)
+    {
+        if (!_projectNameById.ContainsKey(input.ProjectId))
+        {
+            return Task.FromResult<ProjectSavedView?>(null);
+        }
+
+        EnsureProjectMetadata(input.ProjectId);
+        var savedViews = _savedViewsByProjectId[input.ProjectId];
+        savedViews.RemoveAll(view => string.Equals(view.Name, input.Name.Trim(), StringComparison.OrdinalIgnoreCase));
+
+        var savedView = new ProjectSavedView(
+            Guid.NewGuid(),
+            input.ProjectId,
+            input.Name.Trim(),
+            input.ViewMode,
+            input.FilterText.Trim(),
+            input.SortByField.Trim(),
+            input.GroupByField.Trim(),
+            DateTimeOffset.UtcNow);
+        savedViews.Add(savedView);
+        return Task.FromResult<ProjectSavedView?>(savedView);
+    }
+
+    private Guid EnsureProject(string name, string description)
+    {
+        if (_projectIdByName.TryGetValue(name, out var existingProjectId))
+        {
+            return existingProjectId;
+        }
+
+        var projectId = Guid.NewGuid();
+        _projectIdByName[name] = projectId;
+        _projectNameById[projectId] = name;
+        _projectDescriptionById[projectId] = description;
+        EnsureProjectMetadata(projectId);
+        return projectId;
+    }
+
+    private void EnsureProjectsFromIssues()
+    {
+        foreach (var projectName in _issues
+            .Select(static issue => issue.ProjectName)
+            .Where(static projectName => !string.IsNullOrWhiteSpace(projectName))
+            .Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            EnsureProject(projectName!, $"Issues grouped under {projectName}.");
+        }
+    }
+
+    private void EnsureProjectMetadata(Guid projectId)
+    {
+        if (!_customFieldsByProjectId.ContainsKey(projectId))
+        {
+            _customFieldsByProjectId[projectId] =
+            [
+                new ProjectCustomField(
+                    Guid.NewGuid(),
+                    projectId,
+                    "Status",
+                    ProjectCustomFieldType.SingleSelect,
+                    "To do, In progress, Done"),
+                new ProjectCustomField(
+                    Guid.NewGuid(),
+                    projectId,
+                    "Target date",
+                    ProjectCustomFieldType.Date,
+                    string.Empty),
+            ];
+        }
+
+        if (!_savedViewsByProjectId.ContainsKey(projectId))
+        {
+            _savedViewsByProjectId[projectId] =
+            [
+                new ProjectSavedView(
+                    Guid.NewGuid(),
+                    projectId,
+                    "Board",
+                    ProjectViewMode.Board,
+                    "is:open",
+                    "Board position",
+                    "Status",
+                    DateTimeOffset.UtcNow),
+                new ProjectSavedView(
+                    Guid.NewGuid(),
+                    projectId,
+                    "Calendar",
+                    ProjectViewMode.Calendar,
+                    "has:due-date",
+                    "Due date",
+                    "Due date",
+                    DateTimeOffset.UtcNow),
+            ];
+        }
+    }
+
+    private ProjectSummary BuildProjectSummary(Guid projectId)
+    {
+        var projectName = _projectNameById[projectId];
+        var issues = _issues
+            .Where(issue => string.Equals(issue.ProjectName, projectName, StringComparison.OrdinalIgnoreCase))
+            .ToArray();
+
+        return new ProjectSummary(
+            projectId,
+            projectName,
+            _projectDescriptionById.GetValueOrDefault(projectId, string.Empty),
+            issues.Length,
+            issues.Count(static issue => issue.State == IssueWorkflowState.Open),
+            issues.Count(static issue => issue.State == IssueWorkflowState.Closed),
+            issues.Length == 0
+                ? DateTimeOffset.UtcNow
+                : issues.Max(static issue => issue.UpdatedAtUtc));
+    }
+
+    private ProjectIssueItem BuildProjectIssueItem(Guid projectId, IssueListItem issue)
+    {
+        var projectItemId = EnsureProjectItem(projectId, issue.Id);
+        return new ProjectIssueItem(
+            projectItemId,
+            issue.Id,
+            issue.Number,
+            issue.Title,
+            issue.State,
+            issue.StateReason,
+            issue.Priority,
+            issue.AssigneeDisplayName,
+            issue.DueDate,
+            _boardColumnByProjectItemId[projectItemId],
+            issue.Number,
+            issue.UpdatedAtUtc,
+            _customFieldValuesByProjectItemId.TryGetValue(projectItemId, out var values)
+                ? new Dictionary<string, string>(values, StringComparer.OrdinalIgnoreCase)
+                : ProjectIssueItem.EmptyCustomFieldValues);
+    }
+
+    private Guid EnsureProjectItem(Guid projectId, Guid issueId)
+    {
+        var key = (projectId, issueId);
+        if (_projectItemIdByIssue.TryGetValue(key, out var existingProjectItemId))
+        {
+            return existingProjectItemId;
+        }
+
+        var issue = _issues.First(item => item.Id == issueId);
+        var projectItemId = Guid.NewGuid();
+        _projectItemIdByIssue[key] = projectItemId;
+        _projectItemLocationById[projectItemId] = key;
+        _boardColumnByProjectItemId[projectItemId] = GetDefaultBoardColumn(issue);
+        return projectItemId;
+    }
+
+    private static ProjectBoardColumn BuildProjectBoardColumn(
+        string columnName,
+        IReadOnlyList<ProjectIssueItem> items)
+    {
+        var columnItems = items
+            .Where(item => string.Equals(item.BoardColumn, columnName, StringComparison.OrdinalIgnoreCase))
+            .OrderBy(static item => item.SortOrder)
+            .ToArray();
+
+        return new ProjectBoardColumn(
+            columnName,
+            columnItems.Count(static item => item.State == IssueWorkflowState.Open),
+            columnItems);
+    }
+
+    private static string GetDefaultBoardColumn(IssueListItem issue)
+    {
+        if (issue.State == IssueWorkflowState.Closed)
+        {
+            return "Done";
+        }
+
+        return issue.Priority is IssuePriority.Critical or IssuePriority.High
+            ? "In progress"
+            : "To do";
     }
 
     private IssueComment[] GetComments(Guid issueId)

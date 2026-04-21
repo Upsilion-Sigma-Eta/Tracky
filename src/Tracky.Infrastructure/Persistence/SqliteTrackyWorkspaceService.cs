@@ -1,7 +1,9 @@
+using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Text;
 using Microsoft.Data.Sqlite;
 using Tracky.Core.Issues;
+using Tracky.Core.Projects;
 using Tracky.Core.Services;
 using Tracky.Core.Workspaces;
 
@@ -9,6 +11,17 @@ namespace Tracky.Infrastructure.Persistence;
 
 public sealed class SqliteTrackyWorkspaceService(TrackyWorkspacePathProvider pathProvider) : ITrackyWorkspaceService
 {
+    private const string BoardColumnTodo = "To do";
+    private const string BoardColumnInProgress = "In progress";
+    private const string BoardColumnDone = "Done";
+
+    private static readonly string[] BoardColumns =
+    [
+        BoardColumnTodo,
+        BoardColumnInProgress,
+        BoardColumnDone,
+    ];
+
     private static readonly string[] SeedLabels =
     [
         "foundation",
@@ -144,6 +157,17 @@ public sealed class SqliteTrackyWorkspaceService(TrackyWorkspacePathProvider pat
             issueId,
             input.Labels,
             cancellationToken);
+        await SyncIssueProjectAsync(
+            connection,
+            transaction,
+            workspace.Id,
+            issueId,
+            Normalize(input.ProjectName),
+            IssueWorkflowState.Open,
+            input.Priority,
+            input.DueDate,
+            now,
+            cancellationToken);
 
         await InsertActivityEventAsync(
             connection,
@@ -175,6 +199,7 @@ public sealed class SqliteTrackyWorkspaceService(TrackyWorkspacePathProvider pat
         }
 
         var now = DateTimeOffset.UtcNow;
+        var currentIssueState = await GetIssueStateAsync(connection, transaction, input.IssueId, cancellationToken);
         var updateCommand = connection.CreateCommand();
         updateCommand.Transaction = transaction;
         updateCommand.CommandText =
@@ -208,6 +233,17 @@ public sealed class SqliteTrackyWorkspaceService(TrackyWorkspacePathProvider pat
         // Phase 1의 기본 CRUD는 메타데이터와 본문을 한 번에 편집하는 흐름이므로,
         // 라벨 동기화와 활동 로그를 같은 트랜잭션 안에 묶어 상세 화면의 타임라인을 일관되게 유지한다.
         await SyncLabelsAsync(connection, transaction, workspaceId, input.IssueId, input.Labels, cancellationToken);
+        await SyncIssueProjectAsync(
+            connection,
+            transaction,
+            workspaceId,
+            input.IssueId,
+            Normalize(input.ProjectName),
+            currentIssueState,
+            input.Priority,
+            input.DueDate,
+            now,
+            cancellationToken);
         await InsertActivityEventAsync(
             connection,
             transaction,
@@ -253,6 +289,7 @@ public sealed class SqliteTrackyWorkspaceService(TrackyWorkspacePathProvider pat
             return null;
         }
 
+        await SyncProjectItemStateAsync(connection, transaction, input.IssueId, input.State, now, cancellationToken);
         await InsertActivityEventAsync(
             connection,
             transaction,
@@ -390,6 +427,209 @@ public sealed class SqliteTrackyWorkspaceService(TrackyWorkspacePathProvider pat
         return outputPath;
     }
 
+    public async Task<IReadOnlyList<ProjectSummary>> GetProjectsAsync(CancellationToken cancellationToken = default)
+    {
+        await using var connection = await OpenInitializedConnectionAsync(cancellationToken);
+        return await GetProjectSummariesAsync(connection, cancellationToken);
+    }
+
+    public async Task<ProjectDetail?> GetProjectDetailAsync(Guid projectId, CancellationToken cancellationToken = default)
+    {
+        await using var connection = await OpenInitializedConnectionAsync(cancellationToken);
+        return await GetProjectDetailFromConnectionAsync(connection, projectId, cancellationToken);
+    }
+
+    public async Task<ProjectSummary> CreateProjectAsync(
+        CreateProjectInput input,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(input.Name);
+
+        await using var connection = await OpenInitializedConnectionAsync(cancellationToken);
+        await using var transaction = (SqliteTransaction)await connection.BeginTransactionAsync(cancellationToken);
+
+        var workspace = await GetWorkspaceAsync(connection, cancellationToken);
+        var now = DateTimeOffset.UtcNow;
+        var projectId = await EnsureProjectAsync(
+            connection,
+            transaction,
+            workspace.Id,
+            Normalize(input.Name)!,
+            Normalize(input.Description) ?? string.Empty,
+            now,
+            cancellationToken);
+
+        await EnsureDefaultProjectMetadataAsync(connection, transaction, projectId, now, cancellationToken);
+
+        await transaction.CommitAsync(cancellationToken);
+        return (await GetProjectSummaryByIdAsync(connection, projectId, cancellationToken))!;
+    }
+
+    public async Task<ProjectIssueItem?> MoveProjectItemAsync(
+        MoveProjectItemInput input,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(input.BoardColumn);
+
+        await using var connection = await OpenInitializedConnectionAsync(cancellationToken);
+        await using var transaction = (SqliteTransaction)await connection.BeginTransactionAsync(cancellationToken);
+
+        var normalizedColumn = NormalizeBoardColumn(input.BoardColumn);
+        var itemRow = await GetProjectItemIdentityAsync(connection, transaction, input.ProjectItemId, cancellationToken);
+        if (itemRow is null)
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            return null;
+        }
+
+        var now = DateTimeOffset.UtcNow;
+        var nextSortOrder = await GetNextProjectItemSortOrderAsync(
+            connection,
+            transaction,
+            itemRow.ProjectId,
+            normalizedColumn,
+            cancellationToken);
+
+        var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText =
+            """
+            UPDATE project_items
+            SET board_column = $boardColumn,
+                sort_order = $sortOrder,
+                updated_utc = $updatedUtc
+            WHERE id = $id;
+            """;
+        command.Parameters.AddWithValue("$id", input.ProjectItemId.ToString());
+        command.Parameters.AddWithValue("$boardColumn", normalizedColumn);
+        command.Parameters.AddWithValue("$sortOrder", nextSortOrder);
+        command.Parameters.AddWithValue("$updatedUtc", SerializeTimestamp(now));
+        await command.ExecuteNonQueryAsync(cancellationToken);
+
+        await TouchProjectAsync(connection, transaction, itemRow.ProjectId, now, cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return await GetProjectIssueItemByIdAsync(connection, input.ProjectItemId, cancellationToken);
+    }
+
+    public async Task<ProjectCustomField?> AddProjectCustomFieldAsync(
+        AddProjectCustomFieldInput input,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(input.Name);
+
+        await using var connection = await OpenInitializedConnectionAsync(cancellationToken);
+        await using var transaction = (SqliteTransaction)await connection.BeginTransactionAsync(cancellationToken);
+
+        if (!await ProjectExistsAsync(connection, transaction, input.ProjectId, cancellationToken))
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            return null;
+        }
+
+        var now = DateTimeOffset.UtcNow;
+        await UpsertProjectCustomFieldAsync(
+            connection,
+            transaction,
+            input.ProjectId,
+            Normalize(input.Name)!,
+            input.FieldType,
+            Normalize(input.OptionsText) ?? string.Empty,
+            now,
+            cancellationToken);
+        await TouchProjectAsync(connection, transaction, input.ProjectId, now, cancellationToken);
+
+        await transaction.CommitAsync(cancellationToken);
+        return await GetProjectCustomFieldByNameAsync(connection, input.ProjectId, Normalize(input.Name)!, cancellationToken);
+    }
+
+    public async Task<ProjectIssueItem?> UpdateProjectCustomFieldValueAsync(
+        UpdateProjectCustomFieldValueInput input,
+        CancellationToken cancellationToken = default)
+    {
+        await using var connection = await OpenInitializedConnectionAsync(cancellationToken);
+        await using var transaction = (SqliteTransaction)await connection.BeginTransactionAsync(cancellationToken);
+
+        var itemRow = await GetProjectItemIdentityAsync(connection, transaction, input.ProjectItemId, cancellationToken);
+        if (itemRow is null
+            || !await ProjectCustomFieldBelongsToProjectAsync(
+                connection,
+                transaction,
+                itemRow.ProjectId,
+                input.CustomFieldId,
+                cancellationToken))
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            return null;
+        }
+
+        var now = DateTimeOffset.UtcNow;
+        var normalizedValue = Normalize(input.ValueText) ?? string.Empty;
+        var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText =
+            """
+            INSERT INTO project_custom_field_values (
+                project_item_id,
+                custom_field_id,
+                value_text,
+                updated_utc
+            ) VALUES (
+                $projectItemId,
+                $customFieldId,
+                $valueText,
+                $updatedUtc
+            )
+            ON CONFLICT(project_item_id, custom_field_id) DO UPDATE SET
+                value_text = excluded.value_text,
+                updated_utc = excluded.updated_utc;
+            """;
+        command.Parameters.AddWithValue("$projectItemId", input.ProjectItemId.ToString());
+        command.Parameters.AddWithValue("$customFieldId", input.CustomFieldId.ToString());
+        command.Parameters.AddWithValue("$valueText", normalizedValue);
+        command.Parameters.AddWithValue("$updatedUtc", SerializeTimestamp(now));
+        await command.ExecuteNonQueryAsync(cancellationToken);
+
+        // 커스텀 필드 값은 프로젝트 뷰의 정렬과 저장 뷰 필터에 영향을 주므로,
+        // 값 저장 시 프로젝트와 아이템의 updated 시각을 같이 갱신해 목록 freshness를 유지한다.
+        await TouchProjectItemAsync(connection, transaction, input.ProjectItemId, now, cancellationToken);
+        await TouchProjectAsync(connection, transaction, itemRow.ProjectId, now, cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return await GetProjectIssueItemByIdAsync(connection, input.ProjectItemId, cancellationToken);
+    }
+
+    public async Task<ProjectSavedView?> AddProjectSavedViewAsync(
+        AddProjectSavedViewInput input,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(input.Name);
+
+        await using var connection = await OpenInitializedConnectionAsync(cancellationToken);
+        await using var transaction = (SqliteTransaction)await connection.BeginTransactionAsync(cancellationToken);
+
+        if (!await ProjectExistsAsync(connection, transaction, input.ProjectId, cancellationToken))
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            return null;
+        }
+
+        var now = DateTimeOffset.UtcNow;
+        await UpsertProjectSavedViewAsync(
+            connection,
+            transaction,
+            input.ProjectId,
+            Normalize(input.Name)!,
+            input.ViewMode,
+            Normalize(input.FilterText) ?? string.Empty,
+            Normalize(input.SortByField) ?? "Board position",
+            Normalize(input.GroupByField) ?? string.Empty,
+            now,
+            cancellationToken);
+        await TouchProjectAsync(connection, transaction, input.ProjectId, now, cancellationToken);
+
+        await transaction.CommitAsync(cancellationToken);
+        return await GetProjectSavedViewByNameAsync(connection, input.ProjectId, Normalize(input.Name)!, cancellationToken);
+    }
+
     private async Task<SqliteConnection> OpenInitializedConnectionAsync(CancellationToken cancellationToken)
     {
         var connectionStringBuilder = new SqliteConnectionStringBuilder
@@ -413,6 +653,7 @@ public sealed class SqliteTrackyWorkspaceService(TrackyWorkspacePathProvider pat
 
         await EnsureSchemaAsync(connection, cancellationToken);
         await SeedIfNeededAsync(connection, cancellationToken);
+        await EnsureProjectRecordsForExistingIssuesAsync(connection, cancellationToken);
         return connection;
     }
 
@@ -496,10 +737,76 @@ public sealed class SqliteTrackyWorkspaceService(TrackyWorkspacePathProvider pat
                 created_utc TEXT NOT NULL,
                 FOREIGN KEY (issue_id) REFERENCES issues(id) ON DELETE CASCADE
             );
+
+            CREATE TABLE IF NOT EXISTS projects (
+                id TEXT PRIMARY KEY,
+                workspace_id TEXT NOT NULL,
+                name TEXT NOT NULL,
+                description TEXT NOT NULL,
+                created_utc TEXT NOT NULL,
+                updated_utc TEXT NOT NULL,
+                UNIQUE(workspace_id, name),
+                FOREIGN KEY (workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE
+            );
+
+            CREATE TABLE IF NOT EXISTS project_items (
+                id TEXT PRIMARY KEY,
+                project_id TEXT NOT NULL,
+                issue_id TEXT NOT NULL,
+                board_column TEXT NOT NULL,
+                sort_order INTEGER NOT NULL,
+                created_utc TEXT NOT NULL,
+                updated_utc TEXT NOT NULL,
+                UNIQUE(project_id, issue_id),
+                FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+                FOREIGN KEY (issue_id) REFERENCES issues(id) ON DELETE CASCADE
+            );
+
+            CREATE TABLE IF NOT EXISTS project_custom_fields (
+                id TEXT PRIMARY KEY,
+                project_id TEXT NOT NULL,
+                name TEXT NOT NULL,
+                field_type TEXT NOT NULL,
+                options_text TEXT NOT NULL,
+                created_utc TEXT NOT NULL,
+                updated_utc TEXT NOT NULL,
+                UNIQUE(project_id, name),
+                FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+            );
+
+            CREATE TABLE IF NOT EXISTS project_custom_field_values (
+                project_item_id TEXT NOT NULL,
+                custom_field_id TEXT NOT NULL,
+                value_text TEXT NOT NULL,
+                updated_utc TEXT NOT NULL,
+                PRIMARY KEY (project_item_id, custom_field_id),
+                FOREIGN KEY (project_item_id) REFERENCES project_items(id) ON DELETE CASCADE,
+                FOREIGN KEY (custom_field_id) REFERENCES project_custom_fields(id) ON DELETE CASCADE
+            );
+
+            CREATE TABLE IF NOT EXISTS project_saved_views (
+                id TEXT PRIMARY KEY,
+                project_id TEXT NOT NULL,
+                name TEXT NOT NULL,
+                view_mode TEXT NOT NULL,
+                filter_text TEXT NOT NULL,
+                sort_by_field TEXT NOT NULL,
+                group_by_field TEXT NOT NULL,
+                created_utc TEXT NOT NULL,
+                updated_utc TEXT NOT NULL,
+                UNIQUE(project_id, name),
+                FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+            );
             """;
         await command.ExecuteNonQueryAsync(cancellationToken);
 
         await EnsureColumnAsync(connection, "issues", "description", "TEXT NOT NULL DEFAULT ''", cancellationToken);
+        await EnsureColumnAsync(
+            connection,
+            "project_saved_views",
+            "sort_by_field",
+            "TEXT NOT NULL DEFAULT 'Board position'",
+            cancellationToken);
     }
 
     private static async Task EnsureColumnAsync(
@@ -524,6 +831,209 @@ public sealed class SqliteTrackyWorkspaceService(TrackyWorkspacePathProvider pat
         var alterCommand = connection.CreateCommand();
         alterCommand.CommandText = $"ALTER TABLE {tableName} ADD COLUMN {columnName} {columnDefinition};";
         await alterCommand.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    private static async Task EnsureProjectRecordsForExistingIssuesAsync(
+        SqliteConnection connection,
+        CancellationToken cancellationToken)
+    {
+        var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            SELECT id, workspace_id, project_name, state, priority, due_date, updated_utc
+            FROM issues
+            WHERE project_name IS NOT NULL AND trim(project_name) <> '';
+            """;
+
+        var issueRows = new List<ProjectIssueSyncRow>();
+        await using (var reader = await command.ExecuteReaderAsync(cancellationToken))
+        {
+            while (await reader.ReadAsync(cancellationToken))
+            {
+                issueRows.Add(
+                    new ProjectIssueSyncRow(
+                        Guid.Parse(reader.GetString(0)),
+                        reader.GetString(1),
+                        reader.GetString(2),
+                        ParseState(reader.GetString(3)),
+                        ParsePriority(reader.GetString(4)),
+                        reader.IsDBNull(5) ? null : ParseStoredDate(reader.GetString(5)),
+                        ParseStoredTimestamp(reader.GetString(6))));
+            }
+        }
+
+        if (issueRows.Count == 0)
+        {
+            return;
+        }
+
+        await using var transaction = (SqliteTransaction)await connection.BeginTransactionAsync(cancellationToken);
+        foreach (var issueRow in issueRows)
+        {
+            await SyncIssueProjectAsync(
+                connection,
+                transaction,
+                issueRow.WorkspaceId,
+                issueRow.IssueId,
+                issueRow.ProjectName,
+                issueRow.State,
+                issueRow.Priority,
+                issueRow.DueDate,
+                issueRow.UpdatedAtUtc,
+                cancellationToken);
+        }
+
+        await transaction.CommitAsync(cancellationToken);
+    }
+
+    private static async Task SyncIssueProjectAsync(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        string workspaceId,
+        Guid issueId,
+        string? projectName,
+        IssueWorkflowState state,
+        IssuePriority priority,
+        DateOnly? dueDate,
+        DateTimeOffset updatedAtUtc,
+        CancellationToken cancellationToken)
+    {
+        // Phase 2에서는 기존 이슈의 project_name을 Project/ProjectItem 관계로 승격한다.
+        // 이 동기화가 있어야 Phase 1 편집 화면에서 프로젝트명을 바꿔도 보드와 테이블이 같은 데이터를 본다.
+        if (string.IsNullOrWhiteSpace(projectName))
+        {
+            var clearCommand = connection.CreateCommand();
+            clearCommand.Transaction = transaction;
+            clearCommand.CommandText = "DELETE FROM project_items WHERE issue_id = $issueId;";
+            clearCommand.Parameters.AddWithValue("$issueId", issueId.ToString());
+            await clearCommand.ExecuteNonQueryAsync(cancellationToken);
+            return;
+        }
+
+        var now = updatedAtUtc;
+        var projectId = await EnsureProjectAsync(
+            connection,
+            transaction,
+            workspaceId,
+            projectName,
+            $"Issues grouped under {projectName}.",
+            now,
+            cancellationToken);
+        var existingItem = await GetProjectItemForIssueAsync(
+            connection,
+            transaction,
+            projectId,
+            issueId,
+            cancellationToken);
+
+        if (existingItem is null)
+        {
+            var insertCommand = connection.CreateCommand();
+            insertCommand.Transaction = transaction;
+            insertCommand.CommandText =
+                """
+                INSERT INTO project_items (
+                    id,
+                    project_id,
+                    issue_id,
+                    board_column,
+                    sort_order,
+                    created_utc,
+                    updated_utc
+                ) VALUES (
+                    $id,
+                    $projectId,
+                    $issueId,
+                    $boardColumn,
+                    $sortOrder,
+                    $createdUtc,
+                    $updatedUtc
+                );
+                """;
+            insertCommand.Parameters.AddWithValue("$id", Guid.NewGuid().ToString());
+            insertCommand.Parameters.AddWithValue("$projectId", projectId.ToString());
+            insertCommand.Parameters.AddWithValue("$issueId", issueId.ToString());
+            insertCommand.Parameters.AddWithValue("$boardColumn", GetDefaultBoardColumn(state, priority, dueDate));
+            insertCommand.Parameters.AddWithValue(
+                "$sortOrder",
+                await GetNextProjectItemSortOrderAsync(
+                    connection,
+                    transaction,
+                    projectId,
+                    GetDefaultBoardColumn(state, priority, dueDate),
+                    cancellationToken));
+            insertCommand.Parameters.AddWithValue("$createdUtc", SerializeTimestamp(now));
+            insertCommand.Parameters.AddWithValue("$updatedUtc", SerializeTimestamp(now));
+            await insertCommand.ExecuteNonQueryAsync(cancellationToken);
+        }
+        else
+        {
+            var touchCommand = connection.CreateCommand();
+            touchCommand.Transaction = transaction;
+            touchCommand.CommandText =
+                """
+                UPDATE project_items
+                SET updated_utc = $updatedUtc
+                WHERE id = $id;
+                """;
+            touchCommand.Parameters.AddWithValue("$id", existingItem.ProjectItemId.ToString());
+            touchCommand.Parameters.AddWithValue("$updatedUtc", SerializeTimestamp(now));
+            await touchCommand.ExecuteNonQueryAsync(cancellationToken);
+        }
+
+        var deleteOtherProjectsCommand = connection.CreateCommand();
+        deleteOtherProjectsCommand.Transaction = transaction;
+        deleteOtherProjectsCommand.CommandText =
+            """
+            DELETE FROM project_items
+            WHERE issue_id = $issueId AND project_id <> $projectId;
+            """;
+        deleteOtherProjectsCommand.Parameters.AddWithValue("$issueId", issueId.ToString());
+        deleteOtherProjectsCommand.Parameters.AddWithValue("$projectId", projectId.ToString());
+        await deleteOtherProjectsCommand.ExecuteNonQueryAsync(cancellationToken);
+
+        await EnsureDefaultProjectMetadataAsync(connection, transaction, projectId, now, cancellationToken);
+        await TouchProjectAsync(connection, transaction, projectId, now, cancellationToken);
+    }
+
+    private static async Task SyncProjectItemStateAsync(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        Guid issueId,
+        IssueWorkflowState state,
+        DateTimeOffset updatedAtUtc,
+        CancellationToken cancellationToken)
+    {
+        var projectIds = await GetProjectIdsForIssueAsync(connection, transaction, issueId, cancellationToken);
+        if (projectIds.Count == 0)
+        {
+            return;
+        }
+
+        var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText =
+            """
+            UPDATE project_items
+            SET board_column = CASE
+                    WHEN $state = 'closed' THEN $doneColumn
+                    WHEN board_column = $doneColumn THEN $todoColumn
+                    ELSE board_column
+                END,
+                updated_utc = $updatedUtc
+            WHERE issue_id = $issueId;
+            """;
+        command.Parameters.AddWithValue("$issueId", issueId.ToString());
+        command.Parameters.AddWithValue("$state", SerializeState(state));
+        command.Parameters.AddWithValue("$doneColumn", BoardColumnDone);
+        command.Parameters.AddWithValue("$todoColumn", BoardColumnTodo);
+        command.Parameters.AddWithValue("$updatedUtc", SerializeTimestamp(updatedAtUtc));
+        await command.ExecuteNonQueryAsync(cancellationToken);
+
+        foreach (var projectId in projectIds)
+        {
+            await TouchProjectAsync(connection, transaction, projectId, updatedAtUtc, cancellationToken);
+        }
     }
 
     private static async Task SeedIfNeededAsync(SqliteConnection connection, CancellationToken cancellationToken)
@@ -804,6 +1314,18 @@ public sealed class SqliteTrackyWorkspaceService(TrackyWorkspacePathProvider pat
             await linkCommand.ExecuteNonQueryAsync(cancellationToken);
         }
 
+        await SyncIssueProjectAsync(
+            connection,
+            transaction,
+            workspaceId,
+            issueId,
+            Normalize(projectName),
+            state,
+            priority,
+            dueDate,
+            updatedAtUtc,
+            cancellationToken);
+
         await InsertActivityEventAsync(
             connection,
             transaction,
@@ -959,6 +1481,522 @@ public sealed class SqliteTrackyWorkspaceService(TrackyWorkspacePathProvider pat
         command.Transaction = transaction;
         command.CommandText = "SELECT COALESCE(MAX(issue_number), 100) + 1 FROM issues;";
         return ReadScalarInt32(await command.ExecuteScalarAsync(cancellationToken));
+    }
+
+    private static async Task<Guid> EnsureProjectAsync(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        string workspaceId,
+        string projectName,
+        string description,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        var selectCommand = connection.CreateCommand();
+        selectCommand.Transaction = transaction;
+        selectCommand.CommandText =
+            """
+            SELECT id
+            FROM projects
+            WHERE workspace_id = $workspaceId AND lower(name) = lower($name)
+            LIMIT 1;
+            """;
+        selectCommand.Parameters.AddWithValue("$workspaceId", workspaceId);
+        selectCommand.Parameters.AddWithValue("$name", projectName);
+
+        var existingId = await selectCommand.ExecuteScalarAsync(cancellationToken);
+        if (existingId is string id)
+        {
+            return Guid.Parse(id);
+        }
+
+        var projectId = Guid.NewGuid();
+        var insertCommand = connection.CreateCommand();
+        insertCommand.Transaction = transaction;
+        insertCommand.CommandText =
+            """
+            INSERT INTO projects (id, workspace_id, name, description, created_utc, updated_utc)
+            VALUES ($id, $workspaceId, $name, $description, $createdUtc, $updatedUtc);
+            """;
+        insertCommand.Parameters.AddWithValue("$id", projectId.ToString());
+        insertCommand.Parameters.AddWithValue("$workspaceId", workspaceId);
+        insertCommand.Parameters.AddWithValue("$name", projectName);
+        insertCommand.Parameters.AddWithValue("$description", description);
+        insertCommand.Parameters.AddWithValue("$createdUtc", SerializeTimestamp(now));
+        insertCommand.Parameters.AddWithValue("$updatedUtc", SerializeTimestamp(now));
+        await insertCommand.ExecuteNonQueryAsync(cancellationToken);
+        return projectId;
+    }
+
+    private static async Task EnsureDefaultProjectMetadataAsync(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        Guid projectId,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        // 기본 커스텀 필드와 저장 뷰는 프로젝트 화면이 처음 열릴 때 비어 보이지 않도록 하는 최소 Phase 2 씨앗이다.
+        // INSERT OR IGNORE를 사용해 사용자가 나중에 같은 이름을 세밀하게 조정해도 부트스트랩이 값을 덮어쓰지 않는다.
+        await InsertDefaultProjectCustomFieldAsync(
+            connection,
+            transaction,
+            projectId,
+            "Status",
+            ProjectCustomFieldType.SingleSelect,
+            string.Join(", ", BoardColumns),
+            now,
+            cancellationToken);
+        await InsertDefaultProjectCustomFieldAsync(
+            connection,
+            transaction,
+            projectId,
+            "Target date",
+            ProjectCustomFieldType.Date,
+            string.Empty,
+            now,
+            cancellationToken);
+        await InsertDefaultProjectCustomFieldAsync(
+            connection,
+            transaction,
+            projectId,
+            "Effort",
+            ProjectCustomFieldType.Number,
+            string.Empty,
+            now,
+            cancellationToken);
+
+        await InsertDefaultProjectSavedViewAsync(
+            connection,
+            transaction,
+            projectId,
+            "Board",
+            ProjectViewMode.Board,
+            "is:open",
+            "Board position",
+            "Status",
+            now,
+            cancellationToken);
+        await InsertDefaultProjectSavedViewAsync(
+            connection,
+            transaction,
+            projectId,
+            "Table",
+            ProjectViewMode.Table,
+            string.Empty,
+            "Issue number",
+            "Priority",
+            now,
+            cancellationToken);
+        await InsertDefaultProjectSavedViewAsync(
+            connection,
+            transaction,
+            projectId,
+            "Calendar",
+            ProjectViewMode.Calendar,
+            "has:due-date",
+            "Due date",
+            "Due date",
+            now,
+            cancellationToken);
+        await InsertDefaultProjectSavedViewAsync(
+            connection,
+            transaction,
+            projectId,
+            "Timeline",
+            ProjectViewMode.Timeline,
+            string.Empty,
+            "Due date",
+            "Due date",
+            now,
+            cancellationToken);
+    }
+
+    private static async Task InsertDefaultProjectCustomFieldAsync(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        Guid projectId,
+        string name,
+        ProjectCustomFieldType fieldType,
+        string optionsText,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText =
+            """
+            INSERT OR IGNORE INTO project_custom_fields (
+                id,
+                project_id,
+                name,
+                field_type,
+                options_text,
+                created_utc,
+                updated_utc
+            ) VALUES (
+                $id,
+                $projectId,
+                $name,
+                $fieldType,
+                $optionsText,
+                $createdUtc,
+                $updatedUtc
+            );
+            """;
+        command.Parameters.AddWithValue("$id", Guid.NewGuid().ToString());
+        command.Parameters.AddWithValue("$projectId", projectId.ToString());
+        command.Parameters.AddWithValue("$name", name);
+        command.Parameters.AddWithValue("$fieldType", SerializeCustomFieldType(fieldType));
+        command.Parameters.AddWithValue("$optionsText", optionsText);
+        command.Parameters.AddWithValue("$createdUtc", SerializeTimestamp(now));
+        command.Parameters.AddWithValue("$updatedUtc", SerializeTimestamp(now));
+        await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    private static async Task InsertDefaultProjectSavedViewAsync(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        Guid projectId,
+        string name,
+        ProjectViewMode viewMode,
+        string filterText,
+        string sortByField,
+        string groupByField,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText =
+            """
+            INSERT OR IGNORE INTO project_saved_views (
+                id,
+                project_id,
+                name,
+                view_mode,
+                filter_text,
+                sort_by_field,
+                group_by_field,
+                created_utc,
+                updated_utc
+            ) VALUES (
+                $id,
+                $projectId,
+                $name,
+                $viewMode,
+                $filterText,
+                $sortByField,
+                $groupByField,
+                $createdUtc,
+                $updatedUtc
+            );
+            """;
+        command.Parameters.AddWithValue("$id", Guid.NewGuid().ToString());
+        command.Parameters.AddWithValue("$projectId", projectId.ToString());
+        command.Parameters.AddWithValue("$name", name);
+        command.Parameters.AddWithValue("$viewMode", SerializeProjectViewMode(viewMode));
+        command.Parameters.AddWithValue("$filterText", filterText);
+        command.Parameters.AddWithValue("$sortByField", sortByField);
+        command.Parameters.AddWithValue("$groupByField", groupByField);
+        command.Parameters.AddWithValue("$createdUtc", SerializeTimestamp(now));
+        command.Parameters.AddWithValue("$updatedUtc", SerializeTimestamp(now));
+        await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    private static async Task UpsertProjectCustomFieldAsync(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        Guid projectId,
+        string name,
+        ProjectCustomFieldType fieldType,
+        string optionsText,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText =
+            """
+            INSERT INTO project_custom_fields (
+                id,
+                project_id,
+                name,
+                field_type,
+                options_text,
+                created_utc,
+                updated_utc
+            ) VALUES (
+                $id,
+                $projectId,
+                $name,
+                $fieldType,
+                $optionsText,
+                $createdUtc,
+                $updatedUtc
+            )
+            ON CONFLICT(project_id, name) DO UPDATE SET
+                field_type = excluded.field_type,
+                options_text = excluded.options_text,
+                updated_utc = excluded.updated_utc;
+            """;
+        command.Parameters.AddWithValue("$id", Guid.NewGuid().ToString());
+        command.Parameters.AddWithValue("$projectId", projectId.ToString());
+        command.Parameters.AddWithValue("$name", name);
+        command.Parameters.AddWithValue("$fieldType", SerializeCustomFieldType(fieldType));
+        command.Parameters.AddWithValue("$optionsText", optionsText);
+        command.Parameters.AddWithValue("$createdUtc", SerializeTimestamp(now));
+        command.Parameters.AddWithValue("$updatedUtc", SerializeTimestamp(now));
+        await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    private static async Task UpsertProjectSavedViewAsync(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        Guid projectId,
+        string name,
+        ProjectViewMode viewMode,
+        string filterText,
+        string sortByField,
+        string groupByField,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText =
+            """
+            INSERT INTO project_saved_views (
+                id,
+                project_id,
+                name,
+                view_mode,
+                filter_text,
+                sort_by_field,
+                group_by_field,
+                created_utc,
+                updated_utc
+            ) VALUES (
+                $id,
+                $projectId,
+                $name,
+                $viewMode,
+                $filterText,
+                $sortByField,
+                $groupByField,
+                $createdUtc,
+                $updatedUtc
+            )
+            ON CONFLICT(project_id, name) DO UPDATE SET
+                view_mode = excluded.view_mode,
+                filter_text = excluded.filter_text,
+                sort_by_field = excluded.sort_by_field,
+                group_by_field = excluded.group_by_field,
+                updated_utc = excluded.updated_utc;
+            """;
+        command.Parameters.AddWithValue("$id", Guid.NewGuid().ToString());
+        command.Parameters.AddWithValue("$projectId", projectId.ToString());
+        command.Parameters.AddWithValue("$name", name);
+        command.Parameters.AddWithValue("$viewMode", SerializeProjectViewMode(viewMode));
+        command.Parameters.AddWithValue("$filterText", filterText);
+        command.Parameters.AddWithValue("$sortByField", sortByField);
+        command.Parameters.AddWithValue("$groupByField", groupByField);
+        command.Parameters.AddWithValue("$createdUtc", SerializeTimestamp(now));
+        command.Parameters.AddWithValue("$updatedUtc", SerializeTimestamp(now));
+        await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    private static async Task<bool> ProjectExistsAsync(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        Guid projectId,
+        CancellationToken cancellationToken)
+    {
+        var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = "SELECT COUNT(1) FROM projects WHERE id = $id;";
+        command.Parameters.AddWithValue("$id", projectId.ToString());
+        return ReadScalarInt32(await command.ExecuteScalarAsync(cancellationToken)) > 0;
+    }
+
+    private static async Task TouchProjectAsync(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        Guid projectId,
+        DateTimeOffset updatedAtUtc,
+        CancellationToken cancellationToken)
+    {
+        var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText =
+            """
+            UPDATE projects
+            SET updated_utc = $updatedUtc
+            WHERE id = $id;
+            """;
+        command.Parameters.AddWithValue("$id", projectId.ToString());
+        command.Parameters.AddWithValue("$updatedUtc", SerializeTimestamp(updatedAtUtc));
+        await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    private static async Task TouchProjectItemAsync(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        Guid projectItemId,
+        DateTimeOffset updatedAtUtc,
+        CancellationToken cancellationToken)
+    {
+        var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText =
+            """
+            UPDATE project_items
+            SET updated_utc = $updatedUtc
+            WHERE id = $id;
+            """;
+        command.Parameters.AddWithValue("$id", projectItemId.ToString());
+        command.Parameters.AddWithValue("$updatedUtc", SerializeTimestamp(updatedAtUtc));
+        await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    private static async Task<bool> ProjectCustomFieldBelongsToProjectAsync(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        Guid projectId,
+        Guid customFieldId,
+        CancellationToken cancellationToken)
+    {
+        var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText =
+            """
+            SELECT COUNT(1)
+            FROM project_custom_fields
+            WHERE id = $customFieldId AND project_id = $projectId;
+            """;
+        command.Parameters.AddWithValue("$customFieldId", customFieldId.ToString());
+        command.Parameters.AddWithValue("$projectId", projectId.ToString());
+        return ReadScalarInt32(await command.ExecuteScalarAsync(cancellationToken)) > 0;
+    }
+
+    private static async Task<ProjectItemIdentity?> GetProjectItemIdentityAsync(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        Guid projectItemId,
+        CancellationToken cancellationToken)
+    {
+        var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText =
+            """
+            SELECT project_id, issue_id
+            FROM project_items
+            WHERE id = $id
+            LIMIT 1;
+            """;
+        command.Parameters.AddWithValue("$id", projectItemId.ToString());
+
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        return await reader.ReadAsync(cancellationToken)
+            ? new ProjectItemIdentity(
+                Guid.Parse(reader.GetString(0)),
+                Guid.Parse(reader.GetString(1)))
+            : null;
+    }
+
+    private static async Task<ProjectItemIdentity?> GetProjectItemForIssueAsync(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        Guid projectId,
+        Guid issueId,
+        CancellationToken cancellationToken)
+    {
+        var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText =
+            """
+            SELECT id, issue_id
+            FROM project_items
+            WHERE project_id = $projectId AND issue_id = $issueId
+            LIMIT 1;
+            """;
+        command.Parameters.AddWithValue("$projectId", projectId.ToString());
+        command.Parameters.AddWithValue("$issueId", issueId.ToString());
+
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        return await reader.ReadAsync(cancellationToken)
+            ? new ProjectItemIdentity(
+                projectId,
+                Guid.Parse(reader.GetString(1)),
+                Guid.Parse(reader.GetString(0)))
+            : null;
+    }
+
+    private static async Task<int> GetNextProjectItemSortOrderAsync(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        Guid projectId,
+        string boardColumn,
+        CancellationToken cancellationToken)
+    {
+        var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText =
+            """
+            SELECT COALESCE(MAX(sort_order), 0) + 1
+            FROM project_items
+            WHERE project_id = $projectId AND board_column = $boardColumn;
+            """;
+        command.Parameters.AddWithValue("$projectId", projectId.ToString());
+        command.Parameters.AddWithValue("$boardColumn", boardColumn);
+        return ReadScalarInt32(await command.ExecuteScalarAsync(cancellationToken));
+    }
+
+    private static async Task<IReadOnlyList<Guid>> GetProjectIdsForIssueAsync(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        Guid issueId,
+        CancellationToken cancellationToken)
+    {
+        var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText =
+            """
+            SELECT DISTINCT project_id
+            FROM project_items
+            WHERE issue_id = $issueId;
+            """;
+        command.Parameters.AddWithValue("$issueId", issueId.ToString());
+
+        var projectIds = new List<Guid>();
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            projectIds.Add(Guid.Parse(reader.GetString(0)));
+        }
+
+        return projectIds;
+    }
+
+    private static async Task<IssueWorkflowState> GetIssueStateAsync(
+        SqliteConnection connection,
+        SqliteTransaction transaction,
+        Guid issueId,
+        CancellationToken cancellationToken)
+    {
+        var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText =
+            """
+            SELECT state
+            FROM issues
+            WHERE id = $id
+            LIMIT 1;
+            """;
+        command.Parameters.AddWithValue("$id", issueId.ToString());
+        var state = await command.ExecuteScalarAsync(cancellationToken);
+        return state is string text
+            ? ParseState(text)
+            : IssueWorkflowState.Open;
     }
 
     private static async Task SyncLabelsAsync(
@@ -1180,6 +2218,372 @@ public sealed class SqliteTrackyWorkspaceService(TrackyWorkspacePathProvider pat
         return issues.FirstOrDefault(issue => issue.Id == issueId);
     }
 
+    private static async Task<IReadOnlyList<ProjectSummary>> GetProjectSummariesAsync(
+        SqliteConnection connection,
+        CancellationToken cancellationToken)
+    {
+        var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            SELECT
+                p.id,
+                p.name,
+                p.description,
+                p.updated_utc,
+                COUNT(pi.id),
+                SUM(CASE WHEN i.state = 'open' THEN 1 ELSE 0 END),
+                SUM(CASE WHEN i.state = 'closed' THEN 1 ELSE 0 END)
+            FROM projects p
+            LEFT JOIN project_items pi ON pi.project_id = p.id
+            LEFT JOIN issues i ON i.id = pi.issue_id
+            GROUP BY p.id, p.name, p.description, p.updated_utc
+            ORDER BY p.updated_utc DESC, p.name ASC;
+            """;
+
+        var projects = new List<ProjectSummary>();
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            projects.Add(ReadProjectSummary(reader));
+        }
+
+        return projects;
+    }
+
+    private static async Task<ProjectSummary?> GetProjectSummaryByIdAsync(
+        SqliteConnection connection,
+        Guid projectId,
+        CancellationToken cancellationToken)
+    {
+        var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            SELECT
+                p.id,
+                p.name,
+                p.description,
+                p.updated_utc,
+                COUNT(pi.id),
+                SUM(CASE WHEN i.state = 'open' THEN 1 ELSE 0 END),
+                SUM(CASE WHEN i.state = 'closed' THEN 1 ELSE 0 END)
+            FROM projects p
+            LEFT JOIN project_items pi ON pi.project_id = p.id
+            LEFT JOIN issues i ON i.id = pi.issue_id
+            WHERE p.id = $projectId
+            GROUP BY p.id, p.name, p.description, p.updated_utc
+            LIMIT 1;
+            """;
+        command.Parameters.AddWithValue("$projectId", projectId.ToString());
+
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        return await reader.ReadAsync(cancellationToken)
+            ? ReadProjectSummary(reader)
+            : null;
+    }
+
+    private static async Task<ProjectDetail?> GetProjectDetailFromConnectionAsync(
+        SqliteConnection connection,
+        Guid projectId,
+        CancellationToken cancellationToken)
+    {
+        var summary = await GetProjectSummaryByIdAsync(connection, projectId, cancellationToken);
+        if (summary is null)
+        {
+            return null;
+        }
+
+        var items = await GetProjectIssueItemsAsync(connection, projectId, cancellationToken);
+        var boardColumns = BoardColumns
+            .Select(column =>
+            {
+                var columnItems = items
+                    .Where(item => string.Equals(item.BoardColumn, column, StringComparison.OrdinalIgnoreCase))
+                    .OrderBy(static item => item.SortOrder)
+                    .ThenBy(static item => item.IssueNumber)
+                    .ToArray();
+
+                return new ProjectBoardColumn(
+                    column,
+                    columnItems.Count(static item => item.State == IssueWorkflowState.Open),
+                    columnItems);
+            })
+            .ToArray();
+        var tableItems = items
+            .OrderBy(static item => item.IssueNumber)
+            .ToArray();
+        var calendarItems = items
+            .Where(static item => item.DueDate is not null)
+            .OrderBy(static item => item.DueDate)
+            .ThenBy(static item => item.IssueNumber)
+            .ToArray();
+        var timelineItems = items
+            .OrderBy(static item => item.DueDate ?? DateOnly.MaxValue)
+            .ThenBy(static item => item.IssueNumber)
+            .ToArray();
+        var customFields = await GetProjectCustomFieldsAsync(connection, projectId, cancellationToken);
+        var savedViews = await GetProjectSavedViewsAsync(connection, projectId, cancellationToken);
+
+        return new ProjectDetail(
+            summary,
+            boardColumns,
+            tableItems,
+            calendarItems,
+            timelineItems,
+            customFields,
+            savedViews);
+    }
+
+    private static async Task<IReadOnlyList<ProjectIssueItem>> GetProjectIssueItemsAsync(
+        SqliteConnection connection,
+        Guid projectId,
+        CancellationToken cancellationToken)
+    {
+        var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            SELECT
+                pi.id,
+                i.id,
+                i.issue_number,
+                i.title,
+                i.state,
+                i.state_reason,
+                i.priority,
+                i.assignee_display_name,
+                i.due_date,
+                pi.board_column,
+                pi.sort_order,
+                i.updated_utc
+            FROM project_items pi
+            INNER JOIN issues i ON i.id = pi.issue_id
+            WHERE pi.project_id = $projectId
+            ORDER BY pi.board_column ASC, pi.sort_order ASC, i.issue_number ASC;
+            """;
+        command.Parameters.AddWithValue("$projectId", projectId.ToString());
+
+        var items = new List<ProjectIssueItem>();
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            items.Add(ReadProjectIssueItem(reader));
+        }
+
+        var valuesByItemId = await GetProjectCustomFieldValuesAsync(connection, projectId, cancellationToken);
+        return [.. items.Select(item => item with
+        {
+            CustomFieldValues = valuesByItemId.GetValueOrDefault(
+                item.ProjectItemId,
+                ProjectIssueItem.EmptyCustomFieldValues),
+        })];
+    }
+
+    private static async Task<ProjectIssueItem?> GetProjectIssueItemByIdAsync(
+        SqliteConnection connection,
+        Guid projectItemId,
+        CancellationToken cancellationToken)
+    {
+        var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            SELECT
+                pi.id,
+                i.id,
+                i.issue_number,
+                i.title,
+                i.state,
+                i.state_reason,
+                i.priority,
+                i.assignee_display_name,
+                i.due_date,
+                pi.board_column,
+                pi.sort_order,
+                i.updated_utc
+            FROM project_items pi
+            INNER JOIN issues i ON i.id = pi.issue_id
+            WHERE pi.id = $projectItemId
+            LIMIT 1;
+            """;
+        command.Parameters.AddWithValue("$projectItemId", projectItemId.ToString());
+
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        if (!await reader.ReadAsync(cancellationToken))
+        {
+            return null;
+        }
+
+        var item = ReadProjectIssueItem(reader);
+        return item with
+        {
+            CustomFieldValues = await GetProjectCustomFieldValuesForItemAsync(
+                connection,
+                item.ProjectItemId,
+                cancellationToken),
+        };
+    }
+
+    private static async Task<Dictionary<Guid, IReadOnlyDictionary<string, string>>> GetProjectCustomFieldValuesAsync(
+        SqliteConnection connection,
+        Guid projectId,
+        CancellationToken cancellationToken)
+    {
+        var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            SELECT
+                v.project_item_id,
+                f.name,
+                v.value_text
+            FROM project_custom_field_values v
+            INNER JOIN project_custom_fields f ON f.id = v.custom_field_id
+            INNER JOIN project_items pi ON pi.id = v.project_item_id
+            WHERE pi.project_id = $projectId
+            ORDER BY f.name ASC;
+            """;
+        command.Parameters.AddWithValue("$projectId", projectId.ToString());
+
+        var mutableValues = new Dictionary<Guid, Dictionary<string, string>>();
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            var projectItemId = Guid.Parse(reader.GetString(0));
+            if (!mutableValues.TryGetValue(projectItemId, out var values))
+            {
+                values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                mutableValues[projectItemId] = values;
+            }
+
+            values[reader.GetString(1)] = reader.GetString(2);
+        }
+
+        return mutableValues.ToDictionary(
+            static pair => pair.Key,
+            static pair => (IReadOnlyDictionary<string, string>)new ReadOnlyDictionary<string, string>(pair.Value));
+    }
+
+    private static async Task<IReadOnlyDictionary<string, string>> GetProjectCustomFieldValuesForItemAsync(
+        SqliteConnection connection,
+        Guid projectItemId,
+        CancellationToken cancellationToken)
+    {
+        var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            SELECT f.name, v.value_text
+            FROM project_custom_field_values v
+            INNER JOIN project_custom_fields f ON f.id = v.custom_field_id
+            WHERE v.project_item_id = $projectItemId
+            ORDER BY f.name ASC;
+            """;
+        command.Parameters.AddWithValue("$projectItemId", projectItemId.ToString());
+
+        var values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            values[reader.GetString(0)] = reader.GetString(1);
+        }
+
+        return values.Count == 0
+            ? ProjectIssueItem.EmptyCustomFieldValues
+            : new ReadOnlyDictionary<string, string>(values);
+    }
+
+    private static async Task<IReadOnlyList<ProjectCustomField>> GetProjectCustomFieldsAsync(
+        SqliteConnection connection,
+        Guid projectId,
+        CancellationToken cancellationToken)
+    {
+        var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            SELECT id, project_id, name, field_type, options_text
+            FROM project_custom_fields
+            WHERE project_id = $projectId
+            ORDER BY name ASC;
+            """;
+        command.Parameters.AddWithValue("$projectId", projectId.ToString());
+
+        var fields = new List<ProjectCustomField>();
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            fields.Add(ReadProjectCustomField(reader));
+        }
+
+        return fields;
+    }
+
+    private static async Task<ProjectCustomField?> GetProjectCustomFieldByNameAsync(
+        SqliteConnection connection,
+        Guid projectId,
+        string name,
+        CancellationToken cancellationToken)
+    {
+        var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            SELECT id, project_id, name, field_type, options_text
+            FROM project_custom_fields
+            WHERE project_id = $projectId AND lower(name) = lower($name)
+            LIMIT 1;
+            """;
+        command.Parameters.AddWithValue("$projectId", projectId.ToString());
+        command.Parameters.AddWithValue("$name", name);
+
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        return await reader.ReadAsync(cancellationToken)
+            ? ReadProjectCustomField(reader)
+            : null;
+    }
+
+    private static async Task<IReadOnlyList<ProjectSavedView>> GetProjectSavedViewsAsync(
+        SqliteConnection connection,
+        Guid projectId,
+        CancellationToken cancellationToken)
+    {
+        var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            SELECT id, project_id, name, view_mode, filter_text, sort_by_field, group_by_field, updated_utc
+            FROM project_saved_views
+            WHERE project_id = $projectId
+            ORDER BY name ASC;
+            """;
+        command.Parameters.AddWithValue("$projectId", projectId.ToString());
+
+        var savedViews = new List<ProjectSavedView>();
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            savedViews.Add(ReadProjectSavedView(reader));
+        }
+
+        return savedViews;
+    }
+
+    private static async Task<ProjectSavedView?> GetProjectSavedViewByNameAsync(
+        SqliteConnection connection,
+        Guid projectId,
+        string name,
+        CancellationToken cancellationToken)
+    {
+        var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            SELECT id, project_id, name, view_mode, filter_text, sort_by_field, group_by_field, updated_utc
+            FROM project_saved_views
+            WHERE project_id = $projectId AND lower(name) = lower($name)
+            LIMIT 1;
+            """;
+        command.Parameters.AddWithValue("$projectId", projectId.ToString());
+        command.Parameters.AddWithValue("$name", name);
+
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        return await reader.ReadAsync(cancellationToken)
+            ? ReadProjectSavedView(reader)
+            : null;
+    }
+
     private static async Task<bool> IssueExistsAsync(
         SqliteConnection connection,
         SqliteTransaction transaction,
@@ -1334,6 +2738,59 @@ public sealed class SqliteTrackyWorkspaceService(TrackyWorkspacePathProvider pat
         return items;
     }
 
+    private static ProjectSummary ReadProjectSummary(SqliteDataReader reader)
+    {
+        return new ProjectSummary(
+            Guid.Parse(reader.GetString(0)),
+            reader.GetString(1),
+            reader.GetString(2),
+            ReadNullableInt32(reader, 4),
+            ReadNullableInt32(reader, 5),
+            ReadNullableInt32(reader, 6),
+            ParseStoredTimestamp(reader.GetString(3)));
+    }
+
+    private static ProjectIssueItem ReadProjectIssueItem(SqliteDataReader reader)
+    {
+        return new ProjectIssueItem(
+            Guid.Parse(reader.GetString(0)),
+            Guid.Parse(reader.GetString(1)),
+            reader.GetInt32(2),
+            reader.GetString(3),
+            ParseState(reader.GetString(4)),
+            ParseReason(reader.GetString(5)),
+            ParsePriority(reader.GetString(6)),
+            reader.IsDBNull(7) ? null : reader.GetString(7),
+            reader.IsDBNull(8) ? null : ParseStoredDate(reader.GetString(8)),
+            reader.GetString(9),
+            reader.GetInt32(10),
+            ParseStoredTimestamp(reader.GetString(11)),
+            ProjectIssueItem.EmptyCustomFieldValues);
+    }
+
+    private static ProjectCustomField ReadProjectCustomField(SqliteDataReader reader)
+    {
+        return new ProjectCustomField(
+            Guid.Parse(reader.GetString(0)),
+            Guid.Parse(reader.GetString(1)),
+            reader.GetString(2),
+            ParseCustomFieldType(reader.GetString(3)),
+            reader.GetString(4));
+    }
+
+    private static ProjectSavedView ReadProjectSavedView(SqliteDataReader reader)
+    {
+        return new ProjectSavedView(
+            Guid.Parse(reader.GetString(0)),
+            Guid.Parse(reader.GetString(1)),
+            reader.GetString(2),
+            ParseProjectViewMode(reader.GetString(3)),
+            reader.GetString(4),
+            reader.GetString(5),
+            reader.GetString(6),
+            ParseStoredTimestamp(reader.GetString(7)));
+    }
+
     private static string SerializeState(IssueWorkflowState state) => state switch
     {
         IssueWorkflowState.Open => "open",
@@ -1384,6 +2841,69 @@ public sealed class SqliteTrackyWorkspaceService(TrackyWorkspacePathProvider pat
         _ => IssuePriority.None,
     };
 
+    private static string SerializeProjectViewMode(ProjectViewMode viewMode) => viewMode switch
+    {
+        ProjectViewMode.Board => "board",
+        ProjectViewMode.Table => "table",
+        ProjectViewMode.Calendar => "calendar",
+        ProjectViewMode.Timeline => "timeline",
+        _ => throw new ArgumentOutOfRangeException(nameof(viewMode), viewMode, null),
+    };
+
+    private static ProjectViewMode ParseProjectViewMode(string viewMode) => viewMode switch
+    {
+        "table" => ProjectViewMode.Table,
+        "calendar" => ProjectViewMode.Calendar,
+        "timeline" => ProjectViewMode.Timeline,
+        _ => ProjectViewMode.Board,
+    };
+
+    private static string SerializeCustomFieldType(ProjectCustomFieldType fieldType) => fieldType switch
+    {
+        ProjectCustomFieldType.Text => "text",
+        ProjectCustomFieldType.Number => "number",
+        ProjectCustomFieldType.Date => "date",
+        ProjectCustomFieldType.SingleSelect => "single_select",
+        _ => throw new ArgumentOutOfRangeException(nameof(fieldType), fieldType, null),
+    };
+
+    private static ProjectCustomFieldType ParseCustomFieldType(string fieldType) => fieldType switch
+    {
+        "number" => ProjectCustomFieldType.Number,
+        "date" => ProjectCustomFieldType.Date,
+        "single_select" => ProjectCustomFieldType.SingleSelect,
+        _ => ProjectCustomFieldType.Text,
+    };
+
+    private static string NormalizeBoardColumn(string boardColumn)
+    {
+        var normalizedColumn = Normalize(boardColumn);
+        if (normalizedColumn is null)
+        {
+            return BoardColumnTodo;
+        }
+
+        return BoardColumns.FirstOrDefault(
+                column => string.Equals(column, normalizedColumn, StringComparison.OrdinalIgnoreCase))
+            ?? BoardColumnTodo;
+    }
+
+    private static string GetDefaultBoardColumn(
+        IssueWorkflowState state,
+        IssuePriority priority,
+        DateOnly? dueDate)
+    {
+        if (state == IssueWorkflowState.Closed)
+        {
+            return BoardColumnDone;
+        }
+
+        var today = DateOnly.FromDateTime(DateTime.Today);
+        return priority is IssuePriority.Critical or IssuePriority.High || dueDate < today
+            ? BoardColumnInProgress
+            : BoardColumnTodo;
+    }
+
     private static string? Normalize(string? text)
     {
         return string.IsNullOrWhiteSpace(text)
@@ -1405,6 +2925,13 @@ public sealed class SqliteTrackyWorkspaceService(TrackyWorkspacePathProvider pat
     {
         // SQLite의 집계 결과는 boxed scalar로 돌아오므로, 변환 문화권을 고정해 Windows 로캘 차이를 차단한다.
         return Convert.ToInt32(value, CultureInfo.InvariantCulture);
+    }
+
+    private static int ReadNullableInt32(SqliteDataReader reader, int ordinal)
+    {
+        return reader.IsDBNull(ordinal)
+            ? 0
+            : ReadScalarInt32(reader.GetValue(ordinal));
     }
 
     private static DateOnly ParseStoredDate(string value)
@@ -1429,6 +2956,20 @@ public sealed class SqliteTrackyWorkspaceService(TrackyWorkspacePathProvider pat
     }
 
     private sealed record WorkspaceRow(string Id, string Name, string Description);
+
+    private sealed record ProjectIssueSyncRow(
+        Guid IssueId,
+        string WorkspaceId,
+        string ProjectName,
+        IssueWorkflowState State,
+        IssuePriority Priority,
+        DateOnly? DueDate,
+        DateTimeOffset UpdatedAtUtc);
+
+    private sealed record ProjectItemIdentity(
+        Guid ProjectId,
+        Guid IssueId,
+        Guid ProjectItemId = default);
 
     private sealed class IssueAccumulator(
         Guid id,

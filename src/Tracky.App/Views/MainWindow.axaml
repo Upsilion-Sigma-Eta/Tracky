@@ -143,7 +143,7 @@
                                FontSize="30"
                                FontWeight="Black"
                                Foreground="{StaticResource TrackyNavInkBrush}" />
-                    <TextBlock Text="Phase 1 Foundation"
+                    <TextBlock Text="Phase 2 Project Core"
                                Foreground="{StaticResource TrackyNavMutedInkBrush}" />
                 </StackPanel>
 
@@ -168,8 +168,14 @@
                     <TextBlock Text="Navigate"
                                FontSize="12"
                                Foreground="{StaticResource TrackyNavMutedInkBrush}" />
-                    <Button Classes="nav-item active" Content="All Issues" />
-                    <Button Classes="nav-item" Content="Projects" IsEnabled="False" />
+                    <Button Classes="nav-item"
+                            Classes.active="{Binding IsIssuesViewActive}"
+                            Command="{Binding ShowIssuesCommand}"
+                            Content="All Issues" />
+                    <Button Classes="nav-item"
+                            Classes.active="{Binding IsProjectsViewActive}"
+                            Command="{Binding ShowProjectsCommand}"
+                            Content="Projects" />
                     <Button Classes="nav-item" Content="Labels" IsEnabled="False" />
                     <Button Classes="nav-item" Content="Milestones" IsEnabled="False" />
                     <Button Classes="nav-item" Content="Saved Views" IsEnabled="False" />
@@ -195,7 +201,10 @@
             </Grid>
         </Border>
 
-        <Grid Grid.Column="1" RowDefinitions="Auto,Auto,*,Auto" RowSpacing="18">
+        <Grid Grid.Column="1"
+              RowDefinitions="Auto,Auto,*,Auto"
+              RowSpacing="18"
+              IsVisible="{Binding IsIssuesViewActive}">
             <Border Classes="surface" Padding="24">
                 <Grid ColumnDefinitions="*,Auto" ColumnSpacing="20">
                     <StackPanel Spacing="8">
@@ -380,6 +389,348 @@
                        TextWrapping="Wrap" />
         </Grid>
 
+        <Grid Grid.Column="1"
+              RowDefinitions="Auto,Auto,*,Auto"
+              RowSpacing="18"
+              IsVisible="{Binding IsProjectsViewActive}">
+            <Border Classes="surface" Padding="24">
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="20">
+                    <StackPanel Spacing="8">
+                        <TextBlock Classes="hero-title" Text="Projects" />
+                        <TextBlock Classes="body"
+                                   Text="Project data now comes from Project and ProjectItem records synchronized with issue metadata."
+                                   TextWrapping="Wrap" />
+                        <TextBlock Classes="mono"
+                                   Text="{Binding ProjectStatusMessage}"
+                                   TextWrapping="Wrap" />
+                        <Grid ColumnDefinitions="230,170,170,*" ColumnSpacing="10">
+                            <TextBox x:Name="ProjectFilterBox"
+                                     Classes="search-box"
+                                     Watermark="is:open priority:high impact:high"
+                                     Text="{Binding ProjectFilterText, UpdateSourceTrigger=PropertyChanged}" />
+                            <ComboBox Grid.Column="1"
+                                      ItemsSource="{Binding AvailableProjectSortFields}"
+                                      SelectedItem="{Binding ProjectSortText}" />
+                            <ComboBox Grid.Column="2"
+                                      ItemsSource="{Binding AvailableProjectGroupFields}"
+                                      SelectedItem="{Binding ProjectGroupByText}" />
+                            <TextBlock Grid.Column="3"
+                                       Classes="muted"
+                                       VerticalAlignment="Center"
+                                       Text="{Binding ProjectArrangementText}" />
+                        </Grid>
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="1"
+                                Orientation="Horizontal"
+                                Spacing="10"
+                                VerticalAlignment="Center">
+                        <Button Classes="scope-chip"
+                                Classes.active="{Binding IsProjectBoardViewActive}"
+                                Command="{Binding ShowProjectBoardCommand}"
+                                Content="Board" />
+                        <Button Classes="scope-chip"
+                                Classes.active="{Binding IsProjectTableViewActive}"
+                                Command="{Binding ShowProjectTableCommand}"
+                                Content="Table" />
+                        <Button Classes="scope-chip"
+                                Classes.active="{Binding IsProjectCalendarViewActive}"
+                                Command="{Binding ShowProjectCalendarCommand}"
+                                Content="Calendar" />
+                        <Button Classes="scope-chip"
+                                Classes.active="{Binding IsProjectTimelineViewActive}"
+                                Command="{Binding ShowProjectTimelineCommand}"
+                                Content="Timeline" />
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <Grid Grid.Row="1" ColumnDefinitions="*,*" ColumnSpacing="14">
+                <Border Classes="surface" Padding="18">
+                    <Grid RowDefinitions="Auto,*" RowSpacing="12">
+                        <TextBlock Classes="section-title" Text="Project List" />
+                        <ListBox x:Name="ProjectListBox"
+                                 Grid.Row="1"
+                                 ItemsSource="{Binding Projects}"
+                                 SelectedItem="{Binding SelectedProject, Mode=TwoWay}"
+                                 Background="Transparent"
+                                 BorderThickness="0">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate x:DataType="vm:ProjectSummaryViewModel">
+                                    <Border Background="{StaticResource TrackySurfaceStrongBrush}"
+                                            BorderBrush="{StaticResource TrackyBorderBrush}"
+                                            BorderThickness="1"
+                                            CornerRadius="18"
+                                            Margin="0,0,0,10"
+                                            Padding="14">
+                                        <StackPanel Spacing="6">
+                                            <TextBlock Text="{Binding Name}"
+                                                       FontSize="17"
+                                                       FontWeight="SemiBold"
+                                                       Foreground="{StaticResource TrackyInkBrush}" />
+                                            <TextBlock Classes="muted"
+                                                       Text="{Binding Description}"
+                                                       TextWrapping="Wrap" />
+                                            <WrapPanel>
+                                                <TextBlock Classes="muted"
+                                                           Margin="0,0,14,0"
+                                                           Text="{Binding IssueCountText}" />
+                                                <TextBlock Classes="muted"
+                                                           Margin="0,0,14,0"
+                                                           Text="{Binding ProgressText}" />
+                                                <TextBlock Classes="muted"
+                                                           Text="{Binding UpdatedText}" />
+                                            </WrapPanel>
+                                        </StackPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                    </Grid>
+                </Border>
+
+                <Border Grid.Column="1" Classes="surface" Padding="18">
+                    <StackPanel Spacing="10">
+                        <TextBlock Classes="section-title" Text="Selected Project" />
+                        <TextBlock Classes="muted"
+                                   IsVisible="{Binding HasNoSelectedProject}"
+                                   Text="No project is selected." />
+                        <StackPanel Spacing="8" IsVisible="{Binding HasSelectedProject}">
+                            <TextBlock Text="{Binding SelectedProject.Name}"
+                                       FontSize="20"
+                                       FontWeight="SemiBold"
+                                       Foreground="{StaticResource TrackyInkBrush}" />
+                            <TextBlock Classes="body"
+                                       Text="{Binding SelectedProject.Description}"
+                                       TextWrapping="Wrap" />
+                            <WrapPanel>
+                                <TextBlock Classes="muted"
+                                           Margin="0,0,16,0"
+                                           Text="{Binding SelectedProject.IssueCountText}" />
+                                <TextBlock Classes="muted"
+                                           Margin="0,0,16,0"
+                                           Text="{Binding SelectedProject.ProgressText}" />
+                                <TextBlock Classes="muted"
+                                           Text="{Binding SelectedProject.UpdatedText}" />
+                            </WrapPanel>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+            <Border Grid.Row="2" Classes="surface" Padding="22">
+                <Grid>
+                    <ScrollViewer IsVisible="{Binding IsProjectBoardViewActive}">
+                        <ItemsControl ItemsSource="{Binding ProjectBoardColumns}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <StackPanel Orientation="Horizontal" Spacing="14" />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:ProjectBoardColumnViewModel">
+                                    <Border Width="282"
+                                            Background="{StaticResource TrackySurfaceStrongBrush}"
+                                            BorderBrush="{StaticResource TrackyBorderBrush}"
+                                            BorderThickness="1"
+                                            CornerRadius="20"
+                                            Margin="0,0,14,0"
+                                            Padding="16">
+                                        <Grid RowDefinitions="Auto,*" RowSpacing="12">
+                                            <StackPanel Spacing="4">
+                                                <TextBlock Text="{Binding Name}"
+                                                           FontSize="18"
+                                                           FontWeight="SemiBold"
+                                                           Foreground="{StaticResource TrackyInkBrush}" />
+                                                <TextBlock Classes="muted" Text="{Binding CountText}" />
+                                            </StackPanel>
+
+                                            <ItemsControl Grid.Row="1" ItemsSource="{Binding Items}">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate x:DataType="vm:ProjectIssueItemViewModel">
+                                                        <Border Background="#FFFDF8"
+                                                                BorderBrush="{StaticResource TrackyBorderBrush}"
+                                                                BorderThickness="1"
+                                                                CornerRadius="16"
+                                                                Margin="0,0,0,10"
+                                                                Padding="14">
+                                                            <StackPanel Spacing="10">
+                                                                <TextBlock Text="{Binding Title}"
+                                                                           FontWeight="SemiBold"
+                                                                           Foreground="{StaticResource TrackyInkBrush}"
+                                                                           TextWrapping="Wrap" />
+                                                                <WrapPanel>
+                                                                    <TextBlock Classes="mono"
+                                                                               Margin="0,0,10,0"
+                                                                               Text="{Binding IssueNumberText}" />
+                                                                    <TextBlock Classes="muted"
+                                                                               Margin="0,0,10,0"
+                                                                               Text="{Binding AssigneeText}" />
+                                                                    <TextBlock Classes="muted"
+                                                                               Text="{Binding DueText}" />
+                                                                </WrapPanel>
+                                                                <Border Background="{Binding PriorityBadgeBackground}"
+                                                                        CornerRadius="999"
+                                                                        HorizontalAlignment="Left"
+                                                                        Padding="9,4">
+                                                                    <TextBlock Text="{Binding PriorityText}"
+                                                                               Foreground="{Binding PriorityBadgeForeground}"
+                                                                               FontWeight="SemiBold" />
+                                                                </Border>
+                                                                <TextBlock Classes="muted"
+                                                                           Text="{Binding CustomFieldSummaryText}"
+                                                                           TextWrapping="Wrap" />
+                                                                <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                                                                    <Button Classes="secondary"
+                                                                            Command="{Binding #RootWindow.((vm:MainWindowViewModel)DataContext).MoveProjectItemBackwardCommand}"
+                                                                            CommandParameter="{Binding}"
+                                                                            Content="{Binding MoveBackwardLabel}" />
+                                                                    <Button Grid.Column="1"
+                                                                            Classes="secondary"
+                                                                            Command="{Binding #RootWindow.((vm:MainWindowViewModel)DataContext).MoveProjectItemForwardCommand}"
+                                                                            CommandParameter="{Binding}"
+                                                                            Content="{Binding MoveForwardLabel}" />
+                                                                </Grid>
+                                                            </StackPanel>
+                                                        </Border>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+
+                    <ScrollViewer IsVisible="{Binding IsProjectTableViewActive}">
+                        <ItemsControl ItemsSource="{Binding ProjectTableGroups}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:ProjectIssueGroupViewModel">
+                                    <StackPanel Spacing="8" Margin="0,0,0,18">
+                                        <Grid ColumnDefinitions="*,Auto">
+                                            <TextBlock Classes="section-title" Text="{Binding Name}" />
+                                            <TextBlock Grid.Column="1" Classes="muted" Text="{Binding CountText}" />
+                                        </Grid>
+
+                                        <ItemsControl ItemsSource="{Binding Items}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate x:DataType="vm:ProjectIssueItemViewModel">
+                                                    <Border Background="{StaticResource TrackySurfaceStrongBrush}"
+                                                            BorderBrush="{StaticResource TrackyBorderBrush}"
+                                                            BorderThickness="1"
+                                                            CornerRadius="16"
+                                                            Margin="0,0,0,10"
+                                                            Padding="14">
+                                                        <Grid ColumnDefinitions="90,*,120,130,110,180" ColumnSpacing="12">
+                                                            <TextBlock Classes="mono" Text="{Binding IssueNumberText}" />
+                                                            <TextBlock Grid.Column="1"
+                                                                       Text="{Binding Title}"
+                                                                       FontWeight="SemiBold"
+                                                                       Foreground="{StaticResource TrackyInkBrush}" />
+                                                            <TextBlock Grid.Column="2" Classes="muted" Text="{Binding BoardColumn}" />
+                                                            <TextBlock Grid.Column="3" Classes="muted" Text="{Binding AssigneeText}" />
+                                                            <TextBlock Grid.Column="4" Classes="muted" Text="{Binding DueText}" />
+                                                            <TextBlock Grid.Column="5"
+                                                                       Classes="muted"
+                                                                       Text="{Binding CustomFieldSummaryText}" />
+                                                        </Grid>
+                                                    </Border>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+
+                    <ScrollViewer IsVisible="{Binding IsProjectCalendarViewActive}">
+                        <ItemsControl ItemsSource="{Binding ProjectCalendarGroups}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:ProjectIssueGroupViewModel">
+                                    <StackPanel Spacing="8" Margin="0,0,0,18">
+                                        <Grid ColumnDefinitions="*,Auto">
+                                            <TextBlock Classes="section-title" Text="{Binding Name}" />
+                                            <TextBlock Grid.Column="1" Classes="muted" Text="{Binding CountText}" />
+                                        </Grid>
+
+                                        <ItemsControl ItemsSource="{Binding Items}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate x:DataType="vm:ProjectIssueItemViewModel">
+                                                    <Border Background="{StaticResource TrackySurfaceStrongBrush}"
+                                                            BorderBrush="{StaticResource TrackyBorderBrush}"
+                                                            BorderThickness="1"
+                                                            CornerRadius="16"
+                                                            Margin="0,0,0,10"
+                                                            Padding="14">
+                                                        <Grid ColumnDefinitions="140,*,140" ColumnSpacing="12">
+                                                            <TextBlock Classes="body" Text="{Binding DueText}" />
+                                                            <StackPanel Grid.Column="1" Spacing="4">
+                                                                <TextBlock Text="{Binding Title}"
+                                                                           FontWeight="SemiBold"
+                                                                           Foreground="{StaticResource TrackyInkBrush}" />
+                                                                <TextBlock Classes="mono" Text="{Binding IssueNumberText}" />
+                                                            </StackPanel>
+                                                            <TextBlock Grid.Column="2" Classes="muted" Text="{Binding BoardColumn}" />
+                                                        </Grid>
+                                                    </Border>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+
+                    <ScrollViewer IsVisible="{Binding IsProjectTimelineViewActive}">
+                        <ItemsControl ItemsSource="{Binding ProjectTimelineGroups}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:ProjectIssueGroupViewModel">
+                                    <StackPanel Spacing="8" Margin="0,0,0,18">
+                                        <Grid ColumnDefinitions="*,Auto">
+                                            <TextBlock Classes="section-title" Text="{Binding Name}" />
+                                            <TextBlock Grid.Column="1" Classes="muted" Text="{Binding CountText}" />
+                                        </Grid>
+
+                                        <ItemsControl ItemsSource="{Binding Items}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate x:DataType="vm:ProjectIssueItemViewModel">
+                                                    <Border Background="{StaticResource TrackySurfaceStrongBrush}"
+                                                            BorderBrush="{StaticResource TrackyBorderBrush}"
+                                                            BorderThickness="1"
+                                                            CornerRadius="16"
+                                                            Margin="0,0,0,10"
+                                                            Padding="14">
+                                                        <Grid ColumnDefinitions="170,*,120" ColumnSpacing="12">
+                                                            <TextBlock Classes="body" Text="{Binding DueText}" />
+                                                            <StackPanel Grid.Column="1" Spacing="4">
+                                                                <TextBlock Text="{Binding Title}"
+                                                                           FontWeight="SemiBold"
+                                                                           Foreground="{StaticResource TrackyInkBrush}" />
+                                                                <TextBlock Classes="muted" Text="{Binding StateText}" />
+                                                            </StackPanel>
+                                                            <TextBlock Grid.Column="2" Classes="mono" Text="{Binding IssueNumberText}" />
+                                                        </Grid>
+                                                    </Border>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </Grid>
+            </Border>
+
+            <TextBlock Grid.Row="3"
+                       Classes="muted"
+                       Text="{Binding ProjectStatusMessage}"
+                       TextWrapping="Wrap" />
+        </Grid>
+
         <Border Grid.Column="2" Classes="surface" Padding="20">
             <ScrollViewer>
                 <StackPanel Spacing="18">
@@ -387,7 +738,199 @@
                             BorderBrush="{StaticResource TrackyBorderBrush}"
                             BorderThickness="1"
                             CornerRadius="22"
-                            Padding="18">
+                            Padding="18"
+                            IsVisible="{Binding IsProjectsViewActive}">
+                        <StackPanel Spacing="14">
+                            <TextBlock Classes="section-title" Text="New Project" />
+                            <TextBlock Classes="muted"
+                                       Text="Create a project shell first, then assign issues to it from quick capture or issue editing." />
+
+                            <TextBlock Classes="muted" Text="Name" />
+                            <TextBox x:Name="NewProjectNameBox"
+                                     Watermark="Tracky Phase 2"
+                                     Text="{Binding NewProjectName, UpdateSourceTrigger=PropertyChanged}" />
+
+                            <TextBlock Classes="muted" Text="Description" />
+                            <TextBox AcceptsReturn="True"
+                                     Height="90"
+                                     TextWrapping="Wrap"
+                                     VerticalContentAlignment="Top"
+                                     Watermark="Project board, table, calendar, and timeline scope."
+                                     Text="{Binding NewProjectDescription}" />
+
+                            <Button x:Name="CreateProjectButton"
+                                    Classes="primary"
+                                    Command="{Binding CreateProjectCommand}"
+                                    Content="Create project" />
+                        </StackPanel>
+                    </Border>
+
+                    <Border Background="{StaticResource TrackySurfaceStrongBrush}"
+                            BorderBrush="{StaticResource TrackyBorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="22"
+                            Padding="18"
+                            IsVisible="{Binding IsProjectsViewActive}">
+                        <StackPanel Spacing="14">
+                            <TextBlock Classes="section-title" Text="Field Values" />
+                            <TextBlock Classes="muted"
+                                       Text="Select a project item and custom field, then save the value used by filters such as impact:high." />
+
+                            <TextBlock Classes="muted" Text="Project item" />
+                            <ComboBox x:Name="ProjectFieldItemComboBox"
+                                      ItemsSource="{Binding ProjectTableItems}"
+                                      SelectedItem="{Binding SelectedProjectItemForFields}" />
+
+                            <TextBlock Classes="muted" Text="Field" />
+                            <ComboBox x:Name="ProjectFieldComboBox"
+                                      ItemsSource="{Binding ProjectCustomFields}"
+                                      SelectedItem="{Binding SelectedProjectCustomField}" />
+
+                            <TextBlock Classes="muted" Text="Value" />
+                            <TextBox x:Name="ProjectFieldValueBox"
+                                     Watermark="High"
+                                     Text="{Binding DraftCustomFieldValue, UpdateSourceTrigger=PropertyChanged}" />
+
+                            <Button x:Name="SaveProjectCustomFieldValueButton"
+                                    Classes="secondary"
+                                    Command="{Binding SaveProjectCustomFieldValueCommand}"
+                                    Content="Save field value" />
+                        </StackPanel>
+                    </Border>
+
+                    <Border Background="{StaticResource TrackySurfaceStrongBrush}"
+                            BorderBrush="{StaticResource TrackyBorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="22"
+                            Padding="18"
+                            IsVisible="{Binding IsProjectsViewActive}">
+                        <StackPanel Spacing="14">
+                            <TextBlock Classes="section-title" Text="Custom Fields" />
+
+                            <ItemsControl ItemsSource="{Binding ProjectCustomFields}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:ProjectCustomFieldViewModel">
+                                        <Border Background="#FFFDF8"
+                                                BorderBrush="{StaticResource TrackyBorderBrush}"
+                                                BorderThickness="1"
+                                                CornerRadius="14"
+                                                Margin="0,0,0,8"
+                                                Padding="12">
+                                            <StackPanel Spacing="4">
+                                                <TextBlock Text="{Binding Name}"
+                                                           FontWeight="SemiBold"
+                                                           Foreground="{StaticResource TrackyInkBrush}" />
+                                                <WrapPanel>
+                                                    <TextBlock Classes="muted"
+                                                               Margin="0,0,12,0"
+                                                               Text="{Binding FieldTypeText}" />
+                                                    <TextBlock Classes="muted" Text="{Binding OptionsText}" />
+                                                </WrapPanel>
+                                            </StackPanel>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+
+                            <TextBlock Classes="muted" Text="Field name" />
+                            <TextBox Watermark="Impact"
+                                     Text="{Binding DraftCustomFieldName, UpdateSourceTrigger=PropertyChanged}" />
+
+                            <TextBlock Classes="muted" Text="Type" />
+                            <ComboBox ItemsSource="{Binding AvailableProjectCustomFieldTypes}"
+                                      SelectedItem="{Binding DraftCustomFieldType}" />
+
+                            <TextBlock Classes="muted" Text="Options" />
+                            <TextBox Watermark="Low, Medium, High"
+                                     Text="{Binding DraftCustomFieldOptions}" />
+
+                            <Button x:Name="AddProjectCustomFieldButton"
+                                    Classes="secondary"
+                                    Command="{Binding AddProjectCustomFieldCommand}"
+                                    Content="Add custom field" />
+                        </StackPanel>
+                    </Border>
+
+                    <Border Background="{StaticResource TrackySurfaceStrongBrush}"
+                            BorderBrush="{StaticResource TrackyBorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="22"
+                            Padding="18"
+                            IsVisible="{Binding IsProjectsViewActive}">
+                        <StackPanel Spacing="14">
+                            <TextBlock Classes="section-title" Text="Saved Views" />
+
+                            <ItemsControl ItemsSource="{Binding ProjectSavedViews}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:ProjectSavedViewViewModel">
+                                        <Border Background="#FFFDF8"
+                                                BorderBrush="{StaticResource TrackyBorderBrush}"
+                                                BorderThickness="1"
+                                                CornerRadius="14"
+                                                Margin="0,0,0,8"
+                                                Padding="12">
+                                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                                                <StackPanel Spacing="4">
+                                                    <TextBlock Text="{Binding Name}"
+                                                               FontWeight="SemiBold"
+                                                               Foreground="{StaticResource TrackyInkBrush}" />
+                                                    <WrapPanel>
+                                                        <TextBlock Classes="muted"
+                                                                   Margin="0,0,12,0"
+                                                                   Text="{Binding ViewModeText}" />
+                                                        <TextBlock Classes="muted"
+                                                                   Margin="0,0,12,0"
+                                                                   Text="{Binding FilterText}" />
+                                                        <TextBlock Classes="muted"
+                                                                   Margin="0,0,12,0"
+                                                                   Text="{Binding SortText}" />
+                                                        <TextBlock Classes="muted" Text="{Binding GroupByText}" />
+                                                    </WrapPanel>
+                                                </StackPanel>
+                                                <Button Grid.Column="1"
+                                                        Classes="secondary"
+                                                        Command="{Binding #RootWindow.((vm:MainWindowViewModel)DataContext).ApplyProjectSavedViewCommand}"
+                                                        CommandParameter="{Binding}"
+                                                        Content="Apply" />
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+
+                            <TextBlock Classes="muted" Text="View name" />
+                            <TextBox Watermark="High impact board"
+                                     Text="{Binding DraftSavedViewName, UpdateSourceTrigger=PropertyChanged}" />
+
+                            <TextBlock Classes="muted" Text="Mode" />
+                            <ComboBox ItemsSource="{Binding AvailableProjectViewModes}"
+                                      SelectedItem="{Binding DraftSavedViewMode}" />
+
+                            <TextBlock Classes="muted" Text="Filter" />
+                            <TextBox Watermark="is:open priority:high"
+                                     Text="{Binding DraftSavedViewFilter}" />
+
+                            <TextBlock Classes="muted" Text="Sort" />
+                            <ComboBox ItemsSource="{Binding AvailableProjectSortFields}"
+                                      SelectedItem="{Binding DraftSavedViewSort}" />
+
+                            <TextBlock Classes="muted" Text="Group" />
+                            <ComboBox ItemsSource="{Binding AvailableProjectGroupFields}"
+                                      SelectedItem="{Binding DraftSavedViewGroup}" />
+
+                            <Button x:Name="AddProjectSavedViewButton"
+                                    Classes="secondary"
+                                    Command="{Binding AddProjectSavedViewCommand}"
+                                    Content="Add saved view" />
+                        </StackPanel>
+                    </Border>
+
+                    <Border Background="{StaticResource TrackySurfaceStrongBrush}"
+                            BorderBrush="{StaticResource TrackyBorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="22"
+                            Padding="18"
+                            IsVisible="{Binding IsQuickCaptureVisible}">
                         <StackPanel Spacing="14">
                             <TextBlock Classes="section-title" Text="Quick Capture" />
                             <TextBlock Classes="muted"
@@ -429,7 +972,7 @@
                             BorderThickness="1"
                             CornerRadius="22"
                             Padding="18"
-                            IsVisible="{Binding HasSelectedIssueDetail}">
+                            IsVisible="{Binding IsIssueEditorVisible}">
                         <StackPanel Spacing="14">
                             <TextBlock Classes="section-title" Text="Edit Issue" />
                             <TextBlock Classes="muted"
@@ -494,7 +1037,8 @@
                             BorderBrush="{StaticResource TrackyBorderBrush}"
                             BorderThickness="1"
                             CornerRadius="22"
-                            Padding="18">
+                            Padding="18"
+                            IsVisible="{Binding IsIssuesViewActive}">
                         <StackPanel Spacing="10">
                             <TextBlock Classes="section-title" Text="Detail Status" />
                             <TextBlock x:Name="DetailStatusMessageText"
@@ -509,7 +1053,7 @@
                             BorderThickness="1"
                             CornerRadius="22"
                             Padding="18"
-                            IsVisible="{Binding HasNoSelectedIssue}">
+                            IsVisible="{Binding IsIssueDetailPlaceholderVisible}">
                         <StackPanel Spacing="10">
                             <TextBlock Classes="section-title" Text="Issue Details" />
                             <TextBlock Classes="muted"
@@ -519,7 +1063,7 @@
 
                     <ContentControl x:Name="SelectedIssueDetailContent"
                                     Content="{Binding SelectedIssueDetail}"
-                                    IsVisible="{Binding HasSelectedIssueDetail}">
+                                    IsVisible="{Binding IsSelectedIssueDetailVisible}">
                         <ContentControl.ContentTemplate>
                             <DataTemplate x:DataType="vm:IssueDetailViewModel">
                                 <StackPanel Spacing="18">

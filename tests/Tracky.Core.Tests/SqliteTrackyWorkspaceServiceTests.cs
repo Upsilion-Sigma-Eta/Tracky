@@ -1,5 +1,6 @@
 using Microsoft.Data.Sqlite;
 using Tracky.Core.Issues;
+using Tracky.Core.Projects;
 using Tracky.Infrastructure.Persistence;
 
 namespace Tracky.Core.Tests;
@@ -129,6 +130,91 @@ public sealed class SqliteTrackyWorkspaceServiceTests
             Assert.False(string.IsNullOrWhiteSpace(detail.Description));
             Assert.NotEmpty(detail.Activity);
             Assert.Equal(seededIssueWithAttachment.AttachmentCount, detail.Attachments.Count);
+        }
+        finally
+        {
+            SqliteConnection.ClearAllPools();
+
+            if (Directory.Exists(testRoot))
+            {
+                Directory.Delete(testRoot, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task Project_management_core_persists_board_moves_custom_fields_and_saved_views()
+    {
+        var testRoot = Path.Combine(
+            Path.GetTempPath(),
+            "Tracky.Tests",
+            Guid.NewGuid().ToString("N"));
+
+        try
+        {
+            var service = new SqliteTrackyWorkspaceService(
+                new TrackyWorkspacePathProvider(testRoot));
+
+            var createdIssue = await service.CreateIssueAsync(
+                new CreateIssueInput(
+                    "Build the Phase 2 project board",
+                    "Dabin",
+                    IssuePriority.Critical,
+                    new DateOnly(2026, 4, 28),
+                    "Tracky Phase 2",
+                    ["phase2", "project"]));
+            var projects = await service.GetProjectsAsync();
+            var phase2Project = Assert.Single(projects, project => project.Name == "Tracky Phase 2");
+
+            var detail = await service.GetProjectDetailAsync(phase2Project.Id);
+            Assert.NotNull(detail);
+            Assert.Contains(detail.TableItems, item => item.IssueId == createdIssue.Id);
+            Assert.Contains(detail.BoardColumns, column => column.Name == "In progress");
+            Assert.NotEmpty(detail.CustomFields);
+            Assert.NotEmpty(detail.SavedViews);
+
+            var projectItem = detail.TableItems.Single(item => item.IssueId == createdIssue.Id);
+            var movedItem = await service.MoveProjectItemAsync(
+                new MoveProjectItemInput(projectItem.ProjectItemId, "Done"));
+            Assert.NotNull(movedItem);
+            Assert.Equal("Done", movedItem.BoardColumn);
+
+            var field = await service.AddProjectCustomFieldAsync(
+                new AddProjectCustomFieldInput(
+                    phase2Project.Id,
+                    "Impact",
+                    ProjectCustomFieldType.SingleSelect,
+                    "Low, Medium, High"));
+            var savedView = await service.AddProjectSavedViewAsync(
+                new AddProjectSavedViewInput(
+                    phase2Project.Id,
+                    "High impact board",
+                    ProjectViewMode.Board,
+                    "impact:high",
+                    "Priority",
+                    "Status"));
+
+            Assert.NotNull(field);
+            Assert.NotNull(savedView);
+            Assert.Equal("Priority", savedView.SortByField);
+
+            var itemWithFieldValue = await service.UpdateProjectCustomFieldValueAsync(
+                new UpdateProjectCustomFieldValueInput(
+                    projectItem.ProjectItemId,
+                    field.Id,
+                    "High"));
+            Assert.NotNull(itemWithFieldValue);
+            Assert.True(itemWithFieldValue.CustomFieldValues.TryGetValue("Impact", out var impactValue));
+            Assert.Equal("High", impactValue);
+
+            var updatedDetail = await service.GetProjectDetailAsync(phase2Project.Id);
+            Assert.NotNull(updatedDetail);
+            Assert.Contains(updatedDetail.TableItems, item => item.ProjectItemId == projectItem.ProjectItemId && item.BoardColumn == "Done");
+            Assert.Contains(
+                updatedDetail.TableItems,
+                item => item.CustomFieldValues.TryGetValue("Impact", out var value) && value == "High");
+            Assert.Contains(updatedDetail.CustomFields, item => item.Name == "Impact");
+            Assert.Contains(updatedDetail.SavedViews, item => item.Name == "High impact board" && item.SortByField == "Priority");
         }
         finally
         {
