@@ -1,6 +1,7 @@
 using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
 using Avalonia.VisualTree;
+using Tracky.App.Controls;
 using Tracky.App.Tests.TestDoubles;
 using Tracky.App.ViewModels;
 using Tracky.App.Views;
@@ -107,6 +108,43 @@ public sealed class MainWindowHeadlessTests
         finally
         {
             window.Close();
+        }
+    }
+
+    [AvaloniaFact]
+    public void IssueHtmlPreview_uses_text_fallback_inside_scroll_viewers()
+    {
+        var originalDisableWebViewValue = Environment.GetEnvironmentVariable("TRACKY_DISABLE_WEBVIEW");
+        Environment.SetEnvironmentVariable("TRACKY_DISABLE_WEBVIEW", null);
+
+        var preview = new IssueHtmlPreview
+        {
+            HtmlContent = "<p>Preview body</p>",
+            FallbackText = "Preview body",
+            PreviewHeight = 180,
+        };
+
+        var window = new Window
+        {
+            Width = 400,
+            Height = 300,
+            Content = new ScrollViewer
+            {
+                Content = preview,
+            },
+        };
+
+        try
+        {
+            window.Show();
+            window.UpdateLayout();
+
+            Assert.IsType<TextBlock>(preview.Content);
+        }
+        finally
+        {
+            window.Close();
+            Environment.SetEnvironmentVariable("TRACKY_DISABLE_WEBVIEW", originalDisableWebViewValue);
         }
     }
 

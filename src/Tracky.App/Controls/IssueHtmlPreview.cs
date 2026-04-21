@@ -55,13 +55,19 @@ public sealed class IssueHtmlPreview : ContentControl
 
     private void UpdatePreviewContent()
     {
-        if (UseNativeWebView())
+        if (CanUseNativeWebView())
         {
             UpdateNativeWebView();
             return;
         }
 
-        // 헤드리스 테스트에서는 OS WebView 호스트가 없으므로 같은 데이터 바인딩을 텍스트 대체 뷰로 검증한다.
+        UpdateTextFallback();
+    }
+
+    private void UpdateTextFallback()
+    {
+        // 헤드리스 테스트와 ScrollViewer 내부 배치에서는 native WebView 표면을 쓰지 않는다.
+        // 특히 native WebView는 스크롤 오프셋과 클리핑을 무시해 issue body가 헤더 위에 떠 보일 수 있어 텍스트 fallback으로 낮춘다.
         Content = new TextBlock
         {
             Text = FallbackText,
@@ -101,7 +107,24 @@ public sealed class IssueHtmlPreview : ContentControl
         webView.NavigateToString(HtmlContent ?? string.Empty);
     }
 
-    private static bool UseNativeWebView()
+    private bool CanUseNativeWebView()
+    {
+        return IsNativeWebViewEnabled()
+            && IsAttachedToVisualHost()
+            && !IsHostedInsideScrollViewer();
+    }
+
+    private bool IsAttachedToVisualHost()
+    {
+        return this.GetVisualAncestors().Any();
+    }
+
+    private bool IsHostedInsideScrollViewer()
+    {
+        return this.GetVisualAncestors().OfType<ScrollViewer>().Any();
+    }
+
+    private static bool IsNativeWebViewEnabled()
     {
         return !string.Equals(
             Environment.GetEnvironmentVariable("TRACKY_DISABLE_WEBVIEW"),

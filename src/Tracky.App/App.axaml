@@ -12,17 +12,24 @@
         <SolidColorBrush x:Key="TrackyCanvasBrush" Color="#F6F8FA" />
         <SolidColorBrush x:Key="TrackySurfaceBrush" Color="#FFFFFF" />
         <SolidColorBrush x:Key="TrackySurfaceStrongBrush" Color="#F6F8FA" />
+        <SolidColorBrush x:Key="TrackySurfaceSubtleBrush" Color="#F6F8FA" />
         <SolidColorBrush x:Key="TrackyBorderBrush" Color="#D0D7DE" />
-        <SolidColorBrush x:Key="TrackyInkBrush" Color="#24292F" />
-        <SolidColorBrush x:Key="TrackyMutedInkBrush" Color="#57606A" />
-        <SolidColorBrush x:Key="TrackyAccentBrush" Color="#1F883D" />
-        <SolidColorBrush x:Key="TrackyAccentSoftBrush" Color="#DAFBE1" />
+        <SolidColorBrush x:Key="TrackyBorderMutedBrush" Color="#D8DEE4" />
+        <SolidColorBrush x:Key="TrackyInkBrush" Color="#1F2328" />
+        <SolidColorBrush x:Key="TrackyMutedInkBrush" Color="#656D76" />
+        <SolidColorBrush x:Key="TrackyAccentBrush" Color="#0969DA" />
+        <SolidColorBrush x:Key="TrackyAccentSoftBrush" Color="#DDF4FF" />
         <SolidColorBrush x:Key="TrackyNavBrush" Color="#24292F" />
-        <SolidColorBrush x:Key="TrackyNavHoverBrush" Color="#3B434D" />
+        <!-- 네비게이션 호버 색은 배경 대비 충분히 밝게 잡아야 Fluent 기본 Button 호버가 덮어써도 가시성이 유지된다. -->
+        <SolidColorBrush x:Key="TrackyNavHoverBrush" Color="#2D333B" />
+        <SolidColorBrush x:Key="TrackyNavItemHoverBrush" Color="#3F4750" />
         <SolidColorBrush x:Key="TrackyNavActiveBrush" Color="#0969DA" />
         <SolidColorBrush x:Key="TrackyNavBorderBrush" Color="#57606A" />
         <SolidColorBrush x:Key="TrackyNavInkBrush" Color="#F6F8FA" />
-        <SolidColorBrush x:Key="TrackyNavMutedInkBrush" Color="#8C959F" />
+        <SolidColorBrush x:Key="TrackyNavMutedInkBrush" Color="#C9D1D9" />
+        <SolidColorBrush x:Key="TrackyOpenBrush" Color="#1A7F37" />
+        <SolidColorBrush x:Key="TrackyClosedBrush" Color="#8250DF" />
+        <SolidColorBrush x:Key="TrackyRowHoverBrush" Color="#F6F8FA" />
     </Application.Resources>
 
     <Application.Styles>

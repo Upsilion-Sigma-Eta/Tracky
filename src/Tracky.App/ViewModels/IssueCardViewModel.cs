@@ -21,9 +21,14 @@ public sealed class IssueCardViewModel(IssueListItem issue) : ViewModelBase
 
     public string StateText => IsOpen ? "Open" : "Closed";
 
-    public string StateIconText => IsOpen ? "!" : "x";
+    // GitHub Issues 아이콘에 대응: 열린 이슈는 점이 찍힌 원(●), 닫힌 이슈는 상태 사유에 따라 체크(✓)나 빗금(⊘)으로 표시한다.
+    public string StateIconText => IsOpen
+        ? "\u25CF"
+        : Issue.StateReason == IssueStateReason.NotPlanned
+            ? "\u2298"
+            : "\u2713";
 
-    public string StateIconBackground => IsOpen ? "#1F883D" : "#8250DF";
+    public string StateIconBackground => IsOpen ? "#1A7F37" : "#8250DF";
 
     public string StateIconForeground => IsOpen ? "#FFFFFF" : "#FFFFFF";
 
@@ -31,9 +36,9 @@ public sealed class IssueCardViewModel(IssueListItem issue) : ViewModelBase
         ? $"Closed as {FormatStateReason(Issue.StateReason)}"
         : "Active work";
 
-    public string StateBadgeBackground => IsOpen ? "#DDF4FF" : "#F3F4F6";
+    public string StateBadgeBackground => IsOpen ? "#1A7F37" : "#8250DF";
 
-    public string StateBadgeForeground => IsOpen ? "#0550AE" : "#4B5563";
+    public string StateBadgeForeground => IsOpen ? "#FFFFFF" : "#FFFFFF";
 
     public string PriorityText => Issue.Priority switch
     {
@@ -87,6 +92,8 @@ public sealed class IssueCardViewModel(IssueListItem issue) : ViewModelBase
         : "Task";
 
     public IReadOnlyList<string> Labels => Issue.Labels;
+
+    public IReadOnlyList<LabelChipViewModel> LabelChips { get; } = [.. issue.Labels.Select(static label => new LabelChipViewModel(label))];
 
     public bool HasLabels => Labels.Count > 0;
 

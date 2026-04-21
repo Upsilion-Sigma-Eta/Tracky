@@ -73,17 +73,23 @@ public partial class App : Application
         SetBrushColor("TrackyCanvasBrush", palette.Canvas);
         SetBrushColor("TrackySurfaceBrush", palette.Surface);
         SetBrushColor("TrackySurfaceStrongBrush", palette.SurfaceStrong);
+        SetBrushColor("TrackySurfaceSubtleBrush", palette.SurfaceSubtle);
         SetBrushColor("TrackyBorderBrush", palette.Border);
+        SetBrushColor("TrackyBorderMutedBrush", palette.BorderMuted);
         SetBrushColor("TrackyInkBrush", palette.Ink);
         SetBrushColor("TrackyMutedInkBrush", palette.MutedInk);
         SetBrushColor("TrackyAccentBrush", palette.Accent);
         SetBrushColor("TrackyAccentSoftBrush", palette.AccentSoft);
         SetBrushColor("TrackyNavBrush", palette.Nav);
         SetBrushColor("TrackyNavHoverBrush", palette.NavHover);
+        SetBrushColor("TrackyNavItemHoverBrush", palette.NavItemHover);
         SetBrushColor("TrackyNavActiveBrush", palette.NavActive);
         SetBrushColor("TrackyNavBorderBrush", palette.NavBorder);
         SetBrushColor("TrackyNavInkBrush", palette.NavInk);
         SetBrushColor("TrackyNavMutedInkBrush", palette.NavMutedInk);
+        SetBrushColor("TrackyOpenBrush", palette.Open);
+        SetBrushColor("TrackyClosedBrush", palette.Closed);
+        SetBrushColor("TrackyRowHoverBrush", palette.RowHover);
         ApplyDensityPreference(viewModel.CompactDensityPreference);
     }
 
@@ -94,65 +100,89 @@ public partial class App : Application
             Canvas: "#EFF6FF",
             Surface: "#FFFFFF",
             SurfaceStrong: "#DBEAFE",
+            SurfaceSubtle: "#F5F9FF",
             Border: "#93C5FD",
+            BorderMuted: "#BFDBFE",
             Ink: "#172033",
             MutedInk: "#475569",
             Accent: "#EA580C",
             AccentSoft: "#FFEDD5",
             Nav: "#1D4ED8",
-            NavHover: "#2563EB",
+            NavHover: "#1E40AF",
+            NavItemHover: "#2E5DE6",
             NavActive: "#F97316",
             NavBorder: "#60A5FA",
             NavInk: "#FFFFFF",
-            NavMutedInk: "#DBEAFE"),
+            NavMutedInk: "#DBEAFE",
+            Open: "#1A7F37",
+            Closed: "#8250DF",
+            RowHover: "#DBEAFE"),
         AppThemePreference.DarkBlue => new ThemePalette(
             IsDark: true,
             Canvas: "#0F172A",
             Surface: "#111827",
             SurfaceStrong: "#1E293B",
+            SurfaceSubtle: "#172033",
             Border: "#334155",
+            BorderMuted: "#1F2937",
             Ink: "#F8FAFC",
             MutedInk: "#CBD5E1",
             Accent: "#38BDF8",
             AccentSoft: "#082F49",
             Nav: "#020617",
-            NavHover: "#1E293B",
+            NavHover: "#0F172A",
+            NavItemHover: "#1E293B",
             NavActive: "#2563EB",
             NavBorder: "#334155",
             NavInk: "#F8FAFC",
-            NavMutedInk: "#94A3B8"),
+            NavMutedInk: "#94A3B8",
+            Open: "#22C55E",
+            Closed: "#A855F7",
+            RowHover: "#1E293B"),
         AppThemePreference.DarkOrange => new ThemePalette(
             IsDark: true,
             Canvas: "#18110B",
             Surface: "#1C1917",
             SurfaceStrong: "#292524",
+            SurfaceSubtle: "#1F1915",
             Border: "#57534E",
+            BorderMuted: "#3F3B37",
             Ink: "#FAFAF9",
             MutedInk: "#D6D3D1",
             Accent: "#FB923C",
             AccentSoft: "#431407",
             Nav: "#0C0A09",
-            NavHover: "#292524",
+            NavHover: "#1C1917",
+            NavItemHover: "#2D2623",
             NavActive: "#EA580C",
             NavBorder: "#57534E",
             NavInk: "#FAFAF9",
-            NavMutedInk: "#A8A29E"),
+            NavMutedInk: "#A8A29E",
+            Open: "#FB923C",
+            Closed: "#D946EF",
+            RowHover: "#292524"),
         _ => new ThemePalette(
             IsDark: false,
             Canvas: "#F6F8FA",
             Surface: "#FFFFFF",
             SurfaceStrong: "#F6F8FA",
+            SurfaceSubtle: "#F6F8FA",
             Border: "#D0D7DE",
-            Ink: "#24292F",
-            MutedInk: "#57606A",
+            BorderMuted: "#D8DEE4",
+            Ink: "#1F2328",
+            MutedInk: "#656D76",
             Accent: "#0969DA",
             AccentSoft: "#DDF4FF",
             Nav: "#24292F",
-            NavHover: "#3B434D",
+            NavHover: "#2D333B",
+            NavItemHover: "#3F4750",
             NavActive: "#0969DA",
             NavBorder: "#57606A",
             NavInk: "#F6F8FA",
-            NavMutedInk: "#C9D1D9"),
+            NavMutedInk: "#C9D1D9",
+            Open: "#1A7F37",
+            Closed: "#8250DF",
+            RowHover: "#F6F8FA"),
     };
 
     private static void SetBrushColor(string resourceKey, string colorHex)
@@ -201,15 +231,21 @@ public partial class App : Application
         string Canvas,
         string Surface,
         string SurfaceStrong,
+        string SurfaceSubtle,
         string Border,
+        string BorderMuted,
         string Ink,
         string MutedInk,
         string Accent,
         string AccentSoft,
         string Nav,
         string NavHover,
+        string NavItemHover,
         string NavActive,
         string NavBorder,
         string NavInk,
-        string NavMutedInk);
+        string NavMutedInk,
+        string Open,
+        string Closed,
+        string RowHover);
 }

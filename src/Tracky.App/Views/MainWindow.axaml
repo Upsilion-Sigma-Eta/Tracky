@@ -34,9 +34,10 @@
         </Style>
 
         <Style Selector="TextBlock.hero-title">
-            <Setter Property="FontSize" Value="24" />
+            <Setter Property="FontSize" Value="26" />
             <Setter Property="FontWeight" Value="SemiBold" />
             <Setter Property="Foreground" Value="{StaticResource TrackyInkBrush}" />
+            <Setter Property="LineHeight" Value="32" />
         </Style>
 
         <Style Selector="TextBlock.section-title">
@@ -110,6 +111,9 @@
             <Setter Property="Foreground" Value="{StaticResource TrackyMutedInkBrush}" />
         </Style>
 
+        <!-- Avalonia Fluent 기본 Button 스타일은 :pointerover 상태에서 내부 ContentPresenter 배경을 ButtonBackgroundPointerOver로 덮어쓴다.
+             따라서 Button.* 에만 Background를 설정하면 호버 때 원치 않는 기본 색이 그 위에 그려진다.
+             모든 custom Button 클래스는 /template/ ContentPresenter#PART_ContentPresenter 셀렉터로 직접 덮어써서 톤 일관성을 유지한다. -->
         <Style Selector="Button.nav-item">
             <Setter Property="HorizontalContentAlignment" Value="Left" />
             <Setter Property="Background" Value="Transparent" />
@@ -117,25 +121,48 @@
             <Setter Property="BorderBrush" Value="Transparent" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="CornerRadius" Value="6" />
-            <Setter Property="Padding" Value="14,12" />
+            <Setter Property="Padding" Value="12,10" />
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="FontWeight" Value="Normal" />
         </Style>
 
-        <Style Selector="Button.nav-item.active">
-            <Setter Property="Background" Value="{StaticResource TrackyNavActiveBrush}" />
-            <Setter Property="Foreground" Value="{StaticResource TrackyNavInkBrush}" />
-            <Setter Property="BorderBrush" Value="{StaticResource TrackyNavActiveBrush}" />
+        <Style Selector="Button.nav-item /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+            <Setter Property="CornerRadius" Value="6" />
         </Style>
 
-        <Style Selector="Button.nav-item:pointerover">
-            <Setter Property="Background" Value="{StaticResource TrackyNavHoverBrush}" />
-            <Setter Property="Foreground" Value="{StaticResource TrackyNavInkBrush}" />
+        <Style Selector="Button.nav-item:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{StaticResource TrackyNavItemHoverBrush}" />
             <Setter Property="BorderBrush" Value="{StaticResource TrackyNavBorderBrush}" />
         </Style>
 
-        <Style Selector="Button.nav-item.active:pointerover">
-            <Setter Property="Background" Value="{StaticResource TrackyNavActiveBrush}" />
+        <Style Selector="Button.nav-item:pointerover">
             <Setter Property="Foreground" Value="{StaticResource TrackyNavInkBrush}" />
+        </Style>
+
+        <Style Selector="Button.nav-item:pressed /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{StaticResource TrackyNavHoverBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource TrackyNavBorderBrush}" />
+        </Style>
+
+        <Style Selector="Button.nav-item.active">
+            <Setter Property="Foreground" Value="{StaticResource TrackyNavInkBrush}" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+
+        <Style Selector="Button.nav-item.active /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{StaticResource TrackyNavActiveBrush}" />
             <Setter Property="BorderBrush" Value="{StaticResource TrackyNavActiveBrush}" />
+        </Style>
+
+        <Style Selector="Button.nav-item.active:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{StaticResource TrackyNavActiveBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource TrackyNavActiveBrush}" />
+        </Style>
+
+        <Style Selector="Button.nav-item:disabled">
+            <Setter Property="Opacity" Value="0.55" />
         </Style>
 
         <Style Selector="Button.scope-chip">
@@ -144,31 +171,94 @@
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="CornerRadius" Value="6" />
             <Setter Property="Foreground" Value="{StaticResource TrackyMutedInkBrush}" />
-            <Setter Property="Padding" Value="12,7" />
+            <Setter Property="Padding" Value="12,6" />
+            <Setter Property="FontSize" Value="13" />
+        </Style>
+
+        <Style Selector="Button.scope-chip /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderBrush" Value="{StaticResource TrackyBorderBrush}" />
+            <Setter Property="CornerRadius" Value="6" />
+        </Style>
+
+        <Style Selector="Button.scope-chip:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{StaticResource TrackySurfaceSubtleBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource TrackyBorderBrush}" />
+        </Style>
+
+        <Style Selector="Button.scope-chip:pointerover">
+            <Setter Property="Foreground" Value="{StaticResource TrackyInkBrush}" />
         </Style>
 
         <Style Selector="Button.scope-chip.active">
-            <Setter Property="Background" Value="{StaticResource TrackySurfaceStrongBrush}" />
-            <Setter Property="BorderBrush" Value="{StaticResource TrackyBorderBrush}" />
-            <Setter Property="Foreground" Value="{StaticResource TrackyAccentBrush}" />
+            <Setter Property="Foreground" Value="{StaticResource TrackyInkBrush}" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+
+        <Style Selector="Button.scope-chip.active /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{StaticResource TrackyAccentSoftBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource TrackyAccentBrush}" />
+        </Style>
+
+        <Style Selector="Button.scope-chip.active:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{StaticResource TrackyAccentSoftBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource TrackyAccentBrush}" />
         </Style>
 
         <Style Selector="Button.primary">
-            <Setter Property="Background" Value="{StaticResource TrackyAccentBrush}" />
             <Setter Property="Foreground" Value="White" />
-            <Setter Property="BorderBrush" Value="{StaticResource TrackyAccentBrush}" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="CornerRadius" Value="6" />
-            <Setter Property="Padding" Value="12,8" />
+            <Setter Property="Padding" Value="14,7" />
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+
+        <Style Selector="Button.primary /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{StaticResource TrackyOpenBrush}" />
+            <Setter Property="BorderBrush" Value="#1A7F37" />
+            <Setter Property="CornerRadius" Value="6" />
+        </Style>
+
+        <Style Selector="Button.primary:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#1F883D" />
+            <Setter Property="BorderBrush" Value="#1A7F37" />
+        </Style>
+
+        <Style Selector="Button.primary:pointerover">
+            <Setter Property="Foreground" Value="White" />
+        </Style>
+
+        <Style Selector="Button.primary:pressed /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#137733" />
         </Style>
 
         <Style Selector="Button.secondary">
-            <Setter Property="Background" Value="{StaticResource TrackySurfaceStrongBrush}" />
             <Setter Property="Foreground" Value="{StaticResource TrackyInkBrush}" />
-            <Setter Property="BorderBrush" Value="{StaticResource TrackyBorderBrush}" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="CornerRadius" Value="6" />
-            <Setter Property="Padding" Value="12,8" />
+            <Setter Property="Padding" Value="12,6" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+
+        <Style Selector="Button.secondary /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{StaticResource TrackySurfaceStrongBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource TrackyBorderBrush}" />
+            <Setter Property="CornerRadius" Value="6" />
+        </Style>
+
+        <Style Selector="Button.secondary:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#F3F4F6" />
+            <Setter Property="BorderBrush" Value="{StaticResource TrackyBorderBrush}" />
+        </Style>
+
+        <Style Selector="Button.secondary:pointerover">
+            <Setter Property="Foreground" Value="{StaticResource TrackyInkBrush}" />
+        </Style>
+
+        <Style Selector="Button.secondary:pressed /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{StaticResource TrackyBorderMutedBrush}" />
         </Style>
 
         <Style Selector="TextBox.search-box">
@@ -176,13 +266,36 @@
             <Setter Property="BorderBrush" Value="{StaticResource TrackyBorderBrush}" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="CornerRadius" Value="6" />
-            <Setter Property="Padding" Value="12,9" />
+            <Setter Property="Padding" Value="12,7" />
+            <Setter Property="FontSize" Value="13" />
+        </Style>
+
+        <Style Selector="TextBox.search-box:focus /template/ Border#PART_BorderElement">
+            <Setter Property="BorderBrush" Value="{StaticResource TrackyAccentBrush}" />
         </Style>
 
         <Style Selector="ListBoxItem">
             <Setter Property="Padding" Value="0" />
             <Setter Property="Margin" Value="0" />
             <Setter Property="Background" Value="Transparent" />
+        </Style>
+
+        <!-- ListBoxItem의 hover/selected 배경 또한 Fluent 기본 테마가 /template/ ContentPresenter 경로로 주입하므로 같은 경로로 덮어써야 한다. -->
+        <Style Selector="ListBoxItem /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+        </Style>
+
+        <Style Selector="ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{StaticResource TrackyRowHoverBrush}" />
+        </Style>
+
+        <Style Selector="ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{StaticResource TrackyAccentSoftBrush}" />
+        </Style>
+
+        <Style Selector="ListBoxItem:selected:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{StaticResource TrackyAccentSoftBrush}" />
         </Style>
 
         <Style Selector="ScrollBar">
@@ -195,12 +308,44 @@
             <Setter Property="BorderThickness" Value="0,0,0,2" />
             <Setter Property="CornerRadius" Value="0" />
             <Setter Property="Foreground" Value="{StaticResource TrackyInkBrush}" />
-            <Setter Property="Padding" Value="12,12" />
+            <Setter Property="Padding" Value="12,10" />
+            <Setter Property="FontSize" Value="14" />
+        </Style>
+
+        <Style Selector="Button.github-tab /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0,0,0,2" />
+            <Setter Property="CornerRadius" Value="0" />
+        </Style>
+
+        <Style Selector="Button.github-tab:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{StaticResource TrackyRowHoverBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource TrackyBorderMutedBrush}" />
+        </Style>
+
+        <Style Selector="Button.github-tab:pointerover">
+            <Setter Property="Foreground" Value="{StaticResource TrackyInkBrush}" />
         </Style>
 
         <Style Selector="Button.github-tab.active">
-            <Setter Property="BorderBrush" Value="{StaticResource TrackyAccentBrush}" />
             <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{StaticResource TrackyInkBrush}" />
+        </Style>
+
+        <Style Selector="Button.github-tab.active /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderBrush" Value="#FB8500" />
+            <Setter Property="BorderThickness" Value="0,0,0,2" />
+        </Style>
+
+        <Style Selector="Button.github-tab.active:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{StaticResource TrackyRowHoverBrush}" />
+            <Setter Property="BorderBrush" Value="#FB8500" />
+        </Style>
+
+        <Style Selector="Button.github-tab:disabled">
+            <Setter Property="Opacity" Value="0.45" />
         </Style>
 
         <Style Selector="Button.header-filter">
@@ -216,20 +361,63 @@
             <Setter Property="Foreground" Value="{StaticResource TrackyMutedInkBrush}" />
             <Setter Property="Padding" Value="8,6" />
             <Setter Property="MinWidth" Value="104" />
+            <Setter Property="FontSize" Value="13" />
         </Style>
 
+        <!-- 이슈 행은 GitHub Issues 목록의 subtle hover 피드백을 흉내내기 위해 배경이 RowHoverBrush로 전환된다. -->
         <Style Selector="Border.issue-row">
             <Setter Property="Background" Value="{StaticResource TrackySurfaceBrush}" />
-            <Setter Property="BorderBrush" Value="{StaticResource TrackyBorderBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource TrackyBorderMutedBrush}" />
             <Setter Property="BorderThickness" Value="0,0,0,1" />
             <Setter Property="CornerRadius" Value="0" />
-            <Setter Property="Padding" Value="16,13" />
+            <Setter Property="Padding" Value="16,12" />
+        </Style>
+
+        <Style Selector="ListBoxItem:pointerover Border.issue-row">
+            <Setter Property="Background" Value="{StaticResource TrackyRowHoverBrush}" />
+        </Style>
+
+        <Style Selector="ListBoxItem:selected Border.issue-row">
+            <Setter Property="Background" Value="{StaticResource TrackyAccentSoftBrush}" />
         </Style>
 
         <Style Selector="TextBlock.issue-title">
-            <Setter Property="FontSize" Value="16" />
+            <Setter Property="FontSize" Value="15" />
             <Setter Property="FontWeight" Value="SemiBold" />
             <Setter Property="Foreground" Value="{StaticResource TrackyInkBrush}" />
+        </Style>
+
+        <Style Selector="ListBoxItem:pointerover TextBlock.issue-title">
+            <Setter Property="Foreground" Value="{StaticResource TrackyAccentBrush}" />
+        </Style>
+
+        <!-- GitHub 라벨 칩: 개별 색상 바탕 + 반투명 링 border + 대비 기반 텍스트. LabelChipViewModel이 색을 계산해 내려준다. -->
+        <Style Selector="Border.label-chip">
+            <Setter Property="CornerRadius" Value="999" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="8,1" />
+            <Setter Property="Margin" Value="0,0,6,4" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+
+        <Style Selector="TextBlock.label-chip-text">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+
+        <Style Selector="Border.state-pill">
+            <Setter Property="CornerRadius" Value="999" />
+            <Setter Property="Padding" Value="12,5" />
+        </Style>
+
+        <Style Selector="TextBlock.state-pill-text">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+
+        <Style Selector="Border.meta-chip">
+            <Setter Property="CornerRadius" Value="999" />
+            <Setter Property="Padding" Value="8,3" />
         </Style>
     </Window.Styles>
 
@@ -338,12 +526,13 @@
 
                     <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="2">
                         <Button Classes="github-tab" Content="Code" IsEnabled="False" />
-                        <Button Classes="github-tab active"
+                        <Button Classes="github-tab"
                                 Classes.active="{Binding IsIssuesViewActive}"
                                 Command="{Binding ShowIssuesCommand}"
-                                Content="{Binding TotalIssues, StringFormat='Issues {0}'}" />
+                                Content="{Binding TotalIssues, StringFormat='Issues  {0}'}" />
                         <Button Classes="github-tab" Content="Pull requests" IsEnabled="False" />
                         <Button Classes="github-tab"
+                                Classes.active="{Binding IsProjectsViewActive}"
                                 Command="{Binding ShowProjectsCommand}"
                                 Content="Projects" />
                         <Button Classes="github-tab" Content="Milestones" IsEnabled="False" />
@@ -484,7 +673,7 @@
                                                                Foreground="{Binding PriorityBadgeForeground}"
                                                                Text="{Binding PriorityText}" />
                                                 </Border>
-                                                <ItemsControl ItemsSource="{Binding Labels}"
+                                                <ItemsControl ItemsSource="{Binding LabelChips}"
                                                               IsVisible="{Binding HasLabels}">
                                                     <ItemsControl.ItemsPanel>
                                                         <ItemsPanelTemplate>
@@ -492,16 +681,13 @@
                                                         </ItemsPanelTemplate>
                                                     </ItemsControl.ItemsPanel>
                                                     <ItemsControl.ItemTemplate>
-                                                        <DataTemplate>
-                                                            <Border Background="{StaticResource TrackyAccentSoftBrush}"
-                                                                    BorderBrush="{StaticResource TrackyAccentBrush}"
-                                                                    BorderThickness="1"
-                                                                    CornerRadius="999"
-                                                                    Margin="0,0,6,4"
-                                                                    Padding="8,2">
-                                                                <TextBlock FontSize="12"
-                                                                           Text="{Binding .}"
-                                                                           Foreground="{StaticResource TrackyAccentBrush}" />
+                                                        <DataTemplate x:DataType="vm:LabelChipViewModel">
+                                                            <Border Classes="label-chip"
+                                                                    Background="{Binding Background}"
+                                                                    BorderBrush="{Binding BorderBrush}">
+                                                                <TextBlock Classes="label-chip-text"
+                                                                           Text="{Binding Name}"
+                                                                           Foreground="{Binding Foreground}" />
                                                             </Border>
                                                         </DataTemplate>
                                                     </ItemsControl.ItemTemplate>
@@ -712,26 +898,38 @@
                                     Content="{Binding SelectedIssueDetail}">
                         <ContentControl.ContentTemplate>
                             <DataTemplate x:DataType="vm:IssueDetailViewModel">
-                                <StackPanel Spacing="8">
+                                <StackPanel Spacing="10">
+                                    <!-- 상세 헤더는 GitHub처럼 제목과 #번호가 같은 줄, 상태/메타는 아래 줄에 둬 위계를 분명히 한다. -->
                                     <WrapPanel>
-                                        <Border Background="{Binding Summary.StateBadgeBackground}"
-                                                CornerRadius="999"
-                                                Margin="0,0,8,4"
-                                                Padding="10,5">
-                                            <TextBlock Text="{Binding Summary.StateText}"
-                                                       Foreground="{Binding Summary.StateBadgeForeground}"
-                                                       FontWeight="SemiBold" />
-                                        </Border>
-                                        <TextBlock Classes="mono"
-                                                   Margin="0,5,8,0"
+                                        <TextBlock Classes="hero-title"
+                                                   Text="{Binding Summary.Title}"
+                                                   TextWrapping="Wrap" />
+                                        <TextBlock FontSize="26"
+                                                   FontWeight="Light"
+                                                   Margin="8,0,0,0"
+                                                   VerticalAlignment="Center"
+                                                   Foreground="{StaticResource TrackyMutedInkBrush}"
                                                    Text="{Binding Summary.NumberText}" />
-                                        <TextBlock Classes="muted"
-                                                   Margin="0,5,0,0"
-                                                   Text="{Binding Summary.UpdatedText}" />
                                     </WrapPanel>
-                                    <TextBlock Classes="hero-title"
-                                               Text="{Binding Summary.Title}"
-                                               TextWrapping="Wrap" />
+                                    <WrapPanel>
+                                        <Border Classes="state-pill"
+                                                Background="{Binding Summary.StateBadgeBackground}"
+                                                Margin="0,0,10,0">
+                                            <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                                                <TextBlock FontSize="12"
+                                                           VerticalAlignment="Center"
+                                                           Foreground="{Binding Summary.StateBadgeForeground}"
+                                                           Text="{Binding Summary.StateIconText}" />
+                                                <TextBlock Classes="state-pill-text"
+                                                           Foreground="{Binding Summary.StateBadgeForeground}"
+                                                           Text="{Binding Summary.StateText}" />
+                                            </StackPanel>
+                                        </Border>
+                                        <TextBlock Classes="muted"
+                                                   VerticalAlignment="Center"
+                                                   Margin="0,0,0,0"
+                                                   Text="{Binding Summary.GitHubListMetaText}" />
+                                    </WrapPanel>
                                 </StackPanel>
                             </DataTemplate>
                         </ContentControl.ContentTemplate>
@@ -827,7 +1025,7 @@
                                             </WrapPanel>
                                         </Grid>
 
-                                        <ItemsControl ItemsSource="{Binding Summary.Labels}"
+                                        <ItemsControl ItemsSource="{Binding Summary.LabelChips}"
                                                       IsVisible="{Binding Summary.HasLabels}">
                                             <ItemsControl.ItemsPanel>
                                                 <ItemsPanelTemplate>
@@ -835,15 +1033,15 @@
                                                 </ItemsPanelTemplate>
                                             </ItemsControl.ItemsPanel>
                                             <ItemsControl.ItemTemplate>
-                                                <DataTemplate>
-                                                    <Border Background="{StaticResource TrackyAccentSoftBrush}"
-                                                            BorderBrush="{StaticResource TrackyAccentBrush}"
-                                                            BorderThickness="1"
-                                                            CornerRadius="999"
+                                                <DataTemplate x:DataType="vm:LabelChipViewModel">
+                                                    <Border Classes="label-chip"
+                                                            Background="{Binding Background}"
+                                                            BorderBrush="{Binding BorderBrush}"
                                                             Margin="0,0,8,6"
-                                                            Padding="9,3">
-                                                        <TextBlock Text="{Binding .}"
-                                                                   Foreground="{StaticResource TrackyAccentBrush}" />
+                                                            Padding="10,3">
+                                                        <TextBlock Classes="label-chip-text"
+                                                                   Text="{Binding Name}"
+                                                                   Foreground="{Binding Foreground}" />
                                                     </Border>
                                                 </DataTemplate>
                                             </ItemsControl.ItemTemplate>
@@ -2144,7 +2342,7 @@
                                                 <TextBlock Grid.Row="6" Grid.Column="1" Classes="body" Text="{Binding AttachmentCountText}" />
                                             </Grid>
 
-                                            <ItemsControl ItemsSource="{Binding Summary.Labels}"
+                                            <ItemsControl ItemsSource="{Binding Summary.LabelChips}"
                                                           IsVisible="{Binding Summary.HasLabels}">
                                                 <ItemsControl.ItemsPanel>
                                                     <ItemsPanelTemplate>
@@ -2152,13 +2350,15 @@
                                                     </ItemsPanelTemplate>
                                                 </ItemsControl.ItemsPanel>
                                                 <ItemsControl.ItemTemplate>
-                                                    <DataTemplate>
-                                                        <Border Background="{StaticResource TrackySurfaceStrongBrush}"
-                                                                CornerRadius="999"
+                                                    <DataTemplate x:DataType="vm:LabelChipViewModel">
+                                                        <Border Classes="label-chip"
+                                                                Background="{Binding Background}"
+                                                                BorderBrush="{Binding BorderBrush}"
                                                                 Margin="0,0,8,8"
-                                                                Padding="10,4">
-                                                            <TextBlock Text="{Binding .}"
-                                                                       Foreground="{StaticResource TrackyMutedInkBrush}" />
+                                                                Padding="10,3">
+                                                            <TextBlock Classes="label-chip-text"
+                                                                       Text="{Binding Name}"
+                                                                       Foreground="{Binding Foreground}" />
                                                         </Border>
                                                     </DataTemplate>
                                                 </ItemsControl.ItemTemplate>
