@@ -1,0 +1,28 @@
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="Tracky.App.App"
+             xmlns:local="using:Tracky.App"
+             RequestedThemeVariant="Light">
+    <Application.DataTemplates>
+        <local:ViewLocator/>
+    </Application.DataTemplates>
+
+    <Application.Resources>
+        <!-- Phase 1 디자인 시스템의 시작점으로, 앱 셸 전반에서 재사용할 기본 팔레트를 먼저 고정한다. -->
+        <SolidColorBrush x:Key="TrackyCanvasBrush" Color="#F4EFE7" />
+        <SolidColorBrush x:Key="TrackySurfaceBrush" Color="#FFFDF8" />
+        <SolidColorBrush x:Key="TrackySurfaceStrongBrush" Color="#FFF8EF" />
+        <SolidColorBrush x:Key="TrackyBorderBrush" Color="#E7E5E4" />
+        <SolidColorBrush x:Key="TrackyInkBrush" Color="#1F2937" />
+        <SolidColorBrush x:Key="TrackyMutedInkBrush" Color="#6B7280" />
+        <SolidColorBrush x:Key="TrackyAccentBrush" Color="#0F766E" />
+        <SolidColorBrush x:Key="TrackyAccentSoftBrush" Color="#D1FAE5" />
+        <SolidColorBrush x:Key="TrackyNavBrush" Color="#171717" />
+        <SolidColorBrush x:Key="TrackyNavInkBrush" Color="#FAFAF9" />
+        <SolidColorBrush x:Key="TrackyNavMutedInkBrush" Color="#A8A29E" />
+    </Application.Resources>
+
+    <Application.Styles>
+        <FluentTheme DensityStyle="Compact" />
+    </Application.Styles>
+</Application>

@@ -1,0 +1,749 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:Tracky.App.ViewModels"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d"
+        d:DesignWidth="1600"
+        d:DesignHeight="980"
+        x:Class="Tracky.App.Views.MainWindow"
+        x:Name="RootWindow"
+        x:DataType="vm:MainWindowViewModel"
+        Width="1600"
+        Height="980"
+        MinWidth="1260"
+        MinHeight="820"
+        Background="{StaticResource TrackyCanvasBrush}"
+        Icon="/Assets/avalonia-logo.ico"
+        Title="Tracky">
+    <Window.Styles>
+        <Style Selector="Border.surface">
+            <Setter Property="Background" Value="{StaticResource TrackySurfaceBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource TrackyBorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="24" />
+        </Style>
+
+        <Style Selector="TextBlock.hero-title">
+            <Setter Property="FontSize" Value="30" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{StaticResource TrackyInkBrush}" />
+        </Style>
+
+        <Style Selector="TextBlock.section-title">
+            <Setter Property="FontSize" Value="20" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{StaticResource TrackyInkBrush}" />
+        </Style>
+
+        <Style Selector="TextBlock.metric-value">
+            <Setter Property="FontSize" Value="28" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{StaticResource TrackyInkBrush}" />
+        </Style>
+
+        <Style Selector="TextBlock.metric-label">
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="Foreground" Value="{StaticResource TrackyMutedInkBrush}" />
+        </Style>
+
+        <Style Selector="TextBlock.body">
+            <Setter Property="Foreground" Value="{StaticResource TrackyInkBrush}" />
+            <Setter Property="FontSize" Value="14" />
+        </Style>
+
+        <Style Selector="TextBlock.muted">
+            <Setter Property="Foreground" Value="{StaticResource TrackyMutedInkBrush}" />
+            <Setter Property="FontSize" Value="13" />
+        </Style>
+
+        <Style Selector="TextBlock.mono">
+            <Setter Property="FontFamily" Value="Consolas, Cascadia Mono, Menlo" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Foreground" Value="{StaticResource TrackyMutedInkBrush}" />
+        </Style>
+
+        <Style Selector="Button.nav-item">
+            <Setter Property="HorizontalContentAlignment" Value="Left" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Foreground" Value="{StaticResource TrackyNavMutedInkBrush}" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="16" />
+            <Setter Property="Padding" Value="14,12" />
+        </Style>
+
+        <Style Selector="Button.nav-item.active">
+            <Setter Property="Background" Value="#2C2C2C" />
+            <Setter Property="Foreground" Value="{StaticResource TrackyNavInkBrush}" />
+            <Setter Property="BorderBrush" Value="#3F3F46" />
+        </Style>
+
+        <Style Selector="Button.scope-chip">
+            <Setter Property="Background" Value="#F5F5F4" />
+            <Setter Property="BorderBrush" Value="{StaticResource TrackyBorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="999" />
+            <Setter Property="Foreground" Value="{StaticResource TrackyMutedInkBrush}" />
+            <Setter Property="Padding" Value="14,8" />
+        </Style>
+
+        <Style Selector="Button.scope-chip.active">
+            <Setter Property="Background" Value="{StaticResource TrackyAccentSoftBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource TrackyAccentBrush}" />
+            <Setter Property="Foreground" Value="{StaticResource TrackyAccentBrush}" />
+        </Style>
+
+        <Style Selector="Button.primary">
+            <Setter Property="Background" Value="{StaticResource TrackyAccentBrush}" />
+            <Setter Property="Foreground" Value="White" />
+            <Setter Property="BorderBrush" Value="{StaticResource TrackyAccentBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="16" />
+            <Setter Property="Padding" Value="14,10" />
+        </Style>
+
+        <Style Selector="Button.secondary">
+            <Setter Property="Background" Value="#F5F5F4" />
+            <Setter Property="Foreground" Value="{StaticResource TrackyInkBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource TrackyBorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="16" />
+            <Setter Property="Padding" Value="14,10" />
+        </Style>
+
+        <Style Selector="TextBox.search-box">
+            <Setter Property="Background" Value="{StaticResource TrackySurfaceStrongBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource TrackyBorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="16" />
+            <Setter Property="Padding" Value="14,12" />
+        </Style>
+
+        <Style Selector="ListBoxItem">
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Margin" Value="0,0,0,12" />
+            <Setter Property="Background" Value="Transparent" />
+        </Style>
+
+        <Style Selector="ScrollBar">
+            <Setter Property="Opacity" Value="0.8" />
+        </Style>
+    </Window.Styles>
+
+    <Grid ColumnDefinitions="236,*,340" ColumnSpacing="20" Margin="20">
+        <!-- 왼쪽 앱 셸은 이후 Projects, Labels, Saved Views를 붙일 수 있도록 구조만 먼저 고정한다. -->
+        <Border Grid.Column="0"
+                Background="{StaticResource TrackyNavBrush}"
+                CornerRadius="28"
+                Padding="20">
+            <Grid RowDefinitions="Auto,Auto,*,Auto" RowSpacing="18">
+                <StackPanel Spacing="4">
+                    <TextBlock Text="TRACKY"
+                               FontSize="30"
+                               FontWeight="Black"
+                               Foreground="{StaticResource TrackyNavInkBrush}" />
+                    <TextBlock Text="Phase 1 Foundation"
+                               Foreground="{StaticResource TrackyNavMutedInkBrush}" />
+                </StackPanel>
+
+                <Border Grid.Row="1"
+                        Background="#222222"
+                        BorderBrush="#323232"
+                        BorderThickness="1"
+                        CornerRadius="22"
+                        Padding="16">
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="{Binding WorkspaceName}"
+                                   FontSize="18"
+                                   FontWeight="SemiBold"
+                                   Foreground="{StaticResource TrackyNavInkBrush}" />
+                        <TextBlock Text="{Binding WorkspaceDescription}"
+                                   TextWrapping="Wrap"
+                                   Foreground="{StaticResource TrackyNavMutedInkBrush}" />
+                    </StackPanel>
+                </Border>
+
+                <StackPanel Grid.Row="2" Spacing="10">
+                    <TextBlock Text="Navigate"
+                               FontSize="12"
+                               Foreground="{StaticResource TrackyNavMutedInkBrush}" />
+                    <Button Classes="nav-item active" Content="All Issues" />
+                    <Button Classes="nav-item" Content="Projects" IsEnabled="False" />
+                    <Button Classes="nav-item" Content="Labels" IsEnabled="False" />
+                    <Button Classes="nav-item" Content="Milestones" IsEnabled="False" />
+                    <Button Classes="nav-item" Content="Saved Views" IsEnabled="False" />
+                    <Button Classes="nav-item" Content="Reports" IsEnabled="False" />
+                </StackPanel>
+
+                <Border Grid.Row="3"
+                        Background="#222222"
+                        BorderBrush="#323232"
+                        BorderThickness="1"
+                        CornerRadius="22"
+                        Padding="16">
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="Local-first workspace"
+                                   FontSize="14"
+                                   FontWeight="SemiBold"
+                                   Foreground="{StaticResource TrackyNavInkBrush}" />
+                        <TextBlock Text="The seeded SQLite file gives us a realistic Phase 1 home screen before full issue CRUD is expanded."
+                                   TextWrapping="Wrap"
+                                   Foreground="{StaticResource TrackyNavMutedInkBrush}" />
+                    </StackPanel>
+                </Border>
+            </Grid>
+        </Border>
+
+        <Grid Grid.Column="1" RowDefinitions="Auto,Auto,*,Auto" RowSpacing="18">
+            <Border Classes="surface" Padding="24">
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="20">
+                    <StackPanel Spacing="8">
+                        <TextBlock Classes="hero-title" Text="All Issues" />
+                        <TextBlock Classes="body"
+                                   Text="{Binding WorkspaceDescription}"
+                                   TextWrapping="Wrap" />
+                        <TextBlock Classes="mono"
+                                   Text="{Binding DatabasePath}"
+                                   TextWrapping="Wrap" />
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="1" Spacing="12" Width="360">
+                        <TextBox x:Name="SearchBox"
+                                 Classes="search-box"
+                                 Watermark="Search title, label, assignee, project, or #issue"
+                                 Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}" />
+                        <Button x:Name="RefreshWorkspaceButton"
+                                Classes="secondary"
+                                Command="{Binding RefreshCommand}"
+                                Content="Refresh local workspace" />
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <Grid Grid.Row="1" ColumnDefinitions="*,*,*,*,*" ColumnSpacing="14">
+                <Border Grid.Column="0" Classes="surface" Padding="18">
+                    <StackPanel Spacing="8">
+                        <TextBlock Classes="metric-label" Text="Total issues" />
+                        <TextBlock Classes="metric-value" Text="{Binding TotalIssues}" />
+                    </StackPanel>
+                </Border>
+                <Border Grid.Column="1" Classes="surface" Padding="18">
+                    <StackPanel Spacing="8">
+                        <TextBlock Classes="metric-label" Text="Open" />
+                        <TextBlock Classes="metric-value" Text="{Binding OpenIssues}" />
+                    </StackPanel>
+                </Border>
+                <Border Grid.Column="2" Classes="surface" Padding="18">
+                    <StackPanel Spacing="8">
+                        <TextBlock Classes="metric-label" Text="Closed" />
+                        <TextBlock Classes="metric-value" Text="{Binding ClosedIssues}" />
+                    </StackPanel>
+                </Border>
+                <Border Grid.Column="3" Classes="surface" Padding="18">
+                    <StackPanel Spacing="8">
+                        <TextBlock Classes="metric-label" Text="Overdue" />
+                        <TextBlock Classes="metric-value" Text="{Binding OverdueIssues}" />
+                    </StackPanel>
+                </Border>
+                <Border Grid.Column="4" Classes="surface" Padding="18">
+                    <StackPanel Spacing="8">
+                        <TextBlock Classes="metric-label" Text="Due today" />
+                        <TextBlock Classes="metric-value" Text="{Binding DueTodayIssues}" />
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+            <Border Grid.Row="2" Classes="surface" Padding="22">
+                <Grid RowDefinitions="Auto,*" RowSpacing="18">
+                    <Grid ColumnDefinitions="Auto,Auto,Auto,*" ColumnSpacing="10">
+                        <Button Classes="scope-chip"
+                                Classes.active="{Binding IsAllScopeActive}"
+                                Command="{Binding ShowAllCommand}"
+                                Content="All" />
+                        <Button Grid.Column="1"
+                                Classes="scope-chip"
+                                Classes.active="{Binding IsOpenScopeActive}"
+                                Command="{Binding ShowOpenCommand}"
+                                Content="Open" />
+                        <Button Grid.Column="2"
+                                Classes="scope-chip"
+                                Classes.active="{Binding IsClosedScopeActive}"
+                                Command="{Binding ShowClosedCommand}"
+                                Content="Closed" />
+                        <TextBlock Grid.Column="3"
+                                   Classes="muted"
+                                   HorizontalAlignment="Right"
+                                   VerticalAlignment="Center"
+                                   Text="{Binding UpcomingIssues, StringFormat='Upcoming {0}'}" />
+                    </Grid>
+
+                    <ListBox x:Name="IssueListBox"
+                             Grid.Row="1"
+                             ItemsSource="{Binding VisibleIssues}"
+                             SelectedItem="{Binding SelectedIssue, Mode=TwoWay}"
+                             Background="Transparent"
+                             BorderThickness="0">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate x:DataType="vm:IssueCardViewModel">
+                                <Border Background="{StaticResource TrackySurfaceStrongBrush}"
+                                        BorderBrush="{Binding CardBorderBrush}"
+                                        BorderThickness="1"
+                                        CornerRadius="22"
+                                        Padding="18">
+                                    <StackPanel Spacing="14">
+                                        <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="10">
+                                            <StackPanel>
+                                                <TextBlock Text="{Binding Title}"
+                                                           FontSize="18"
+                                                           FontWeight="SemiBold"
+                                                           Foreground="{StaticResource TrackyInkBrush}" />
+                                                <TextBlock Classes="mono" Text="{Binding NumberText}" />
+                                            </StackPanel>
+
+                                            <Border Grid.Column="1"
+                                                    Background="{Binding PriorityBadgeBackground}"
+                                                    CornerRadius="999"
+                                                    Padding="10,5"
+                                                    VerticalAlignment="Top">
+                                                <TextBlock Text="{Binding PriorityText}"
+                                                           Foreground="{Binding PriorityBadgeForeground}"
+                                                           FontWeight="SemiBold" />
+                                            </Border>
+
+                                            <Border Grid.Column="2"
+                                                    Background="{Binding StateBadgeBackground}"
+                                                    CornerRadius="999"
+                                                    Padding="10,5"
+                                                    VerticalAlignment="Top">
+                                                <TextBlock Text="{Binding StateText}"
+                                                           Foreground="{Binding StateBadgeForeground}"
+                                                           FontWeight="SemiBold" />
+                                            </Border>
+                                        </Grid>
+
+                                        <ItemsControl ItemsSource="{Binding Labels}"
+                                                      IsVisible="{Binding HasLabels}">
+                                            <ItemsControl.ItemsPanel>
+                                                <ItemsPanelTemplate>
+                                                    <WrapPanel />
+                                                </ItemsPanelTemplate>
+                                            </ItemsControl.ItemsPanel>
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Border Background="#F3F4F6"
+                                                            CornerRadius="999"
+                                                            Margin="0,0,8,8"
+                                                            Padding="10,4">
+                                                        <TextBlock Text="{Binding .}"
+                                                                   Foreground="{StaticResource TrackyMutedInkBrush}" />
+                                                    </Border>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+
+                                        <WrapPanel>
+                                            <TextBlock Classes="muted" Margin="0,0,16,0" Text="{Binding StateDetailText}" />
+                                            <TextBlock Classes="muted" Margin="0,0,16,0" Text="{Binding AssigneeText}" />
+                                            <TextBlock Classes="muted" Margin="0,0,16,0" Text="{Binding ProjectText}" />
+                                            <TextBlock Classes="muted"
+                                                       Margin="0,0,16,0"
+                                                       IsVisible="{Binding HasComments}"
+                                                       Text="{Binding CommentsText}" />
+                                            <TextBlock Classes="muted"
+                                                       Margin="0,0,16,0"
+                                                       IsVisible="{Binding HasAttachments}"
+                                                       Text="{Binding AttachmentsText}" />
+                                            <TextBlock Classes="muted" Text="{Binding UpdatedText}" />
+                                        </WrapPanel>
+
+                                        <Border Background="{Binding DueBadgeBackground}"
+                                                CornerRadius="14"
+                                                Padding="12,8"
+                                                HorizontalAlignment="Left"
+                                                IsVisible="{Binding HasDueDate}">
+                                            <TextBlock Text="{Binding DueText}"
+                                                       Foreground="{Binding DueBadgeForeground}"
+                                                       FontWeight="SemiBold" />
+                                        </Border>
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </Grid>
+            </Border>
+
+            <TextBlock Grid.Row="3"
+                       Classes="muted"
+                       Text="{Binding StatusMessage}"
+                       TextWrapping="Wrap" />
+        </Grid>
+
+        <Border Grid.Column="2" Classes="surface" Padding="20">
+            <ScrollViewer>
+                <StackPanel Spacing="18">
+                    <Border Background="{StaticResource TrackySurfaceStrongBrush}"
+                            BorderBrush="{StaticResource TrackyBorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="22"
+                            Padding="18">
+                        <StackPanel Spacing="14">
+                            <TextBlock Classes="section-title" Text="Quick Capture" />
+                            <TextBlock Classes="muted"
+                                       Text="This is the first Phase 1 capture flow: title, owner, priority, due date, and labels are written directly into the local SQLite workspace." />
+
+                            <TextBlock Classes="muted" Text="Title" />
+                            <TextBox x:Name="QuickCaptureTitleBox"
+                                     Watermark="Ship workspace bootstrap and issue shell"
+                                     Text="{Binding DraftTitle}" />
+
+                            <TextBlock Classes="muted" Text="Assignee" />
+                            <TextBox Watermark="Dabin"
+                                     Text="{Binding DraftAssignee}" />
+
+                            <TextBlock Classes="muted" Text="Priority" />
+                            <ComboBox ItemsSource="{Binding AvailablePriorities}"
+                                      SelectedItem="{Binding DraftPriority}" />
+
+                            <TextBlock Classes="muted" Text="Due date" />
+                            <DatePicker SelectedDate="{Binding DraftDueDate}" />
+
+                            <TextBlock Classes="muted" Text="Project" />
+                            <TextBox Watermark="Tracky Foundation"
+                                     Text="{Binding DraftProjectName}" />
+
+                            <TextBlock Classes="muted" Text="Labels" />
+                            <TextBox Watermark="foundation, desktop, ux"
+                                     Text="{Binding DraftLabels}" />
+
+                            <Button x:Name="CreateIssueButton"
+                                    Classes="primary"
+                                    Command="{Binding CreateIssueCommand}"
+                                    Content="Create issue in local workspace" />
+                        </StackPanel>
+                    </Border>
+
+                    <Border Background="{StaticResource TrackySurfaceStrongBrush}"
+                            BorderBrush="{StaticResource TrackyBorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="22"
+                            Padding="18">
+                        <StackPanel Spacing="10">
+                            <TextBlock Classes="section-title" Text="Detail Status" />
+                            <TextBlock x:Name="DetailStatusMessageText"
+                                       Classes="muted"
+                                       Text="{Binding DetailStatusMessage}"
+                                       TextWrapping="Wrap" />
+                        </StackPanel>
+                    </Border>
+
+                    <Border Background="{StaticResource TrackySurfaceStrongBrush}"
+                            BorderBrush="{StaticResource TrackyBorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="22"
+                            Padding="18"
+                            IsVisible="{Binding HasNoSelectedIssue}">
+                        <StackPanel Spacing="10">
+                            <TextBlock Classes="section-title" Text="Issue Details" />
+                            <TextBlock Classes="muted"
+                                       Text="Select an issue from the All Issues list to inspect its description, timeline, comments, and attachments." />
+                        </StackPanel>
+                    </Border>
+
+                    <ContentControl x:Name="SelectedIssueDetailContent"
+                                    Content="{Binding SelectedIssueDetail}"
+                                    IsVisible="{Binding HasSelectedIssueDetail}">
+                        <ContentControl.ContentTemplate>
+                            <DataTemplate x:DataType="vm:IssueDetailViewModel">
+                                <StackPanel Spacing="18">
+                                    <Border Background="{StaticResource TrackySurfaceStrongBrush}"
+                                            BorderBrush="{StaticResource TrackyBorderBrush}"
+                                            BorderThickness="1"
+                                            CornerRadius="22"
+                                            Padding="18">
+                                        <StackPanel Spacing="14">
+                                            <TextBlock Classes="section-title" Text="Issue Details" />
+
+                                            <StackPanel Spacing="6">
+                                                <TextBlock Text="{Binding Summary.Title}"
+                                                           FontSize="22"
+                                                           FontWeight="SemiBold"
+                                                           Foreground="{StaticResource TrackyInkBrush}"
+                                                           TextWrapping="Wrap" />
+                                                <TextBlock Classes="mono" Text="{Binding Summary.NumberText}" />
+                                            </StackPanel>
+
+                                            <WrapPanel>
+                                                <Border Background="{Binding Summary.StateBadgeBackground}"
+                                                        CornerRadius="999"
+                                                        Margin="0,0,8,8"
+                                                        Padding="10,5">
+                                                    <TextBlock Text="{Binding Summary.StateText}"
+                                                               Foreground="{Binding Summary.StateBadgeForeground}"
+                                                               FontWeight="SemiBold" />
+                                                </Border>
+                                                <Border Background="{Binding Summary.PriorityBadgeBackground}"
+                                                        CornerRadius="999"
+                                                        Margin="0,0,8,8"
+                                                        Padding="10,5">
+                                                    <TextBlock Text="{Binding Summary.PriorityText}"
+                                                               Foreground="{Binding Summary.PriorityBadgeForeground}"
+                                                               FontWeight="SemiBold" />
+                                                </Border>
+                                                <Border Background="{Binding Summary.DueBadgeBackground}"
+                                                        CornerRadius="999"
+                                                        Margin="0,0,8,8"
+                                                        Padding="10,5"
+                                                        IsVisible="{Binding Summary.HasDueDate}">
+                                                    <TextBlock Text="{Binding Summary.DueText}"
+                                                               Foreground="{Binding Summary.DueBadgeForeground}"
+                                                               FontWeight="SemiBold" />
+                                                </Border>
+                                            </WrapPanel>
+
+                                            <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto" ColumnSpacing="12" RowSpacing="10">
+                                                <TextBlock Classes="muted" Text="State detail" />
+                                                <TextBlock Grid.Column="1" Classes="body" Text="{Binding Summary.StateDetailText}" />
+
+                                                <TextBlock Grid.Row="1" Classes="muted" Text="Assignee" />
+                                                <TextBlock Grid.Row="1" Grid.Column="1" Classes="body" Text="{Binding Summary.AssigneeText}" />
+
+                                                <TextBlock Grid.Row="2" Classes="muted" Text="Project" />
+                                                <TextBlock Grid.Row="2" Grid.Column="1" Classes="body" Text="{Binding Summary.ProjectText}" />
+
+                                                <TextBlock Grid.Row="3" Classes="muted" Text="Comments" />
+                                                <TextBlock Grid.Row="3" Grid.Column="1" Classes="body" Text="{Binding CommentCountText}" />
+
+                                                <TextBlock Grid.Row="4" Classes="muted" Text="Attachments" />
+                                                <TextBlock Grid.Row="4" Grid.Column="1" Classes="body" Text="{Binding AttachmentCountText}" />
+                                            </Grid>
+
+                                            <ItemsControl ItemsSource="{Binding Summary.Labels}"
+                                                          IsVisible="{Binding Summary.HasLabels}">
+                                                <ItemsControl.ItemsPanel>
+                                                    <ItemsPanelTemplate>
+                                                        <WrapPanel />
+                                                    </ItemsPanelTemplate>
+                                                </ItemsControl.ItemsPanel>
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <Border Background="#F3F4F6"
+                                                                CornerRadius="999"
+                                                                Margin="0,0,8,8"
+                                                                Padding="10,4">
+                                                            <TextBlock Text="{Binding .}"
+                                                                       Foreground="{StaticResource TrackyMutedInkBrush}" />
+                                                        </Border>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+
+                                            <TextBlock Classes="muted" Text="{Binding Summary.UpdatedText}" />
+
+                                            <Button Classes="secondary"
+                                                    Command="{Binding #RootWindow.DataContext.ToggleSelectedIssueStateCommand}"
+                                                    Content="{Binding Summary.ActionLabel}" />
+                                        </StackPanel>
+                                    </Border>
+
+                                    <Border Background="{StaticResource TrackySurfaceStrongBrush}"
+                                            BorderBrush="{StaticResource TrackyBorderBrush}"
+                                            BorderThickness="1"
+                                            CornerRadius="22"
+                                            Padding="18">
+                                        <StackPanel Spacing="12">
+                                            <TextBlock Classes="section-title" Text="Description" />
+                                            <TextBlock Classes="body"
+                                                       Text="{Binding DescriptionText}"
+                                                       TextWrapping="Wrap" />
+                                        </StackPanel>
+                                    </Border>
+
+                                    <Border Background="{StaticResource TrackySurfaceStrongBrush}"
+                                            BorderBrush="{StaticResource TrackyBorderBrush}"
+                                            BorderThickness="1"
+                                            CornerRadius="22"
+                                            Padding="18">
+                                        <StackPanel Spacing="12">
+                                            <TextBlock Classes="section-title" Text="Add Comment" />
+                                            <TextBlock Classes="muted"
+                                                       Text="Use this composer to record notes directly into the local issue timeline." />
+
+                                            <TextBlock Classes="muted" Text="Author" />
+                                            <TextBox Watermark="Dabin"
+                                                     Text="{Binding #RootWindow.DataContext.DraftCommentAuthor}" />
+
+                                            <TextBlock Classes="muted" Text="Comment" />
+                                            <TextBox x:Name="CommentBodyBox"
+                                                     AcceptsReturn="True"
+                                                     Height="120"
+                                                     TextWrapping="Wrap"
+                                                     VerticalContentAlignment="Top"
+                                                     Watermark="Write the next decision, observation, or implementation note."
+                                                     Text="{Binding #RootWindow.DataContext.DraftCommentBody}" />
+
+                                            <Button x:Name="AddCommentButton"
+                                                    Classes="primary"
+                                                    Command="{Binding #RootWindow.DataContext.AddCommentCommand}"
+                                                    Content="Add comment to selected issue" />
+                                        </StackPanel>
+                                    </Border>
+
+                                    <Border Background="{StaticResource TrackySurfaceStrongBrush}"
+                                            BorderBrush="{StaticResource TrackyBorderBrush}"
+                                            BorderThickness="1"
+                                            CornerRadius="22"
+                                            Padding="18">
+                                        <StackPanel Spacing="12">
+                                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                                                <StackPanel>
+                                                    <TextBlock Classes="section-title" Text="Attachments" />
+                                                    <TextBlock Classes="muted"
+                                                               Text="{Binding AttachmentCountText}" />
+                                                </StackPanel>
+                                                <Button x:Name="AttachFileButton"
+                                                        Grid.Column="1"
+                                                        Classes="secondary"
+                                                        Command="{Binding #RootWindow.DataContext.AttachFileCommand}"
+                                                        Content="Attach file" />
+                                            </Grid>
+
+                                            <TextBlock Classes="muted"
+                                                       IsVisible="{Binding HasNoAttachments}"
+                                                       Text="No attachment has been stored for this issue yet." />
+
+                                            <ItemsControl ItemsSource="{Binding Attachments}"
+                                                          IsVisible="{Binding HasAttachments}">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate x:DataType="vm:IssueAttachmentViewModel">
+                                                        <Border Background="#FFFDF8"
+                                                                BorderBrush="{StaticResource TrackyBorderBrush}"
+                                                                BorderThickness="1"
+                                                                CornerRadius="16"
+                                                                Margin="0,0,0,10"
+                                                                Padding="14">
+                                                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                                                                <StackPanel Spacing="4">
+                                                                    <TextBlock Text="{Binding FileName}"
+                                                                               FontWeight="SemiBold"
+                                                                               Foreground="{StaticResource TrackyInkBrush}" />
+                                                                    <WrapPanel>
+                                                                        <TextBlock Classes="muted" Margin="0,0,12,0" Text="{Binding ContentType}" />
+                                                                        <TextBlock Classes="muted" Margin="0,0,12,0" Text="{Binding SizeText}" />
+                                                                        <TextBlock Classes="muted" Text="{Binding CreatedText}" />
+                                                                    </WrapPanel>
+                                                                </StackPanel>
+                                                                <Button Grid.Column="1"
+                                                                        Classes="secondary"
+                                                                        Command="{Binding #RootWindow.DataContext.OpenAttachmentCommand}"
+                                                                        CommandParameter="{Binding}"
+                                                                        Content="Open" />
+                                                            </Grid>
+                                                        </Border>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </StackPanel>
+                                    </Border>
+
+                                    <Border Background="{StaticResource TrackySurfaceStrongBrush}"
+                                            BorderBrush="{StaticResource TrackyBorderBrush}"
+                                            BorderThickness="1"
+                                            CornerRadius="22"
+                                            Padding="18">
+                                        <StackPanel Spacing="12">
+                                            <TextBlock Classes="section-title" Text="Comments" />
+                                            <TextBlock Classes="muted"
+                                                       Text="{Binding CommentCountText}" />
+
+                                            <TextBlock Classes="muted"
+                                                       IsVisible="{Binding HasNoComments}"
+                                                       Text="No comment has been written for this issue yet." />
+
+                                            <ItemsControl ItemsSource="{Binding Comments}"
+                                                          IsVisible="{Binding HasComments}">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate x:DataType="vm:IssueCommentViewModel">
+                                                        <Border Background="#FFFDF8"
+                                                                BorderBrush="{StaticResource TrackyBorderBrush}"
+                                                                BorderThickness="1"
+                                                                CornerRadius="16"
+                                                                Margin="0,0,0,10"
+                                                                Padding="14">
+                                                            <StackPanel Spacing="8">
+                                                                <WrapPanel>
+                                                                    <TextBlock Text="{Binding AuthorDisplayName}"
+                                                                               FontWeight="SemiBold"
+                                                                               Foreground="{StaticResource TrackyInkBrush}" />
+                                                                    <TextBlock Classes="muted"
+                                                                               Margin="10,0,0,0"
+                                                                               Text="{Binding CreatedText}" />
+                                                                </WrapPanel>
+                                                                <TextBlock Classes="body"
+                                                                           Text="{Binding Body}"
+                                                                           TextWrapping="Wrap" />
+                                                            </StackPanel>
+                                                        </Border>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </StackPanel>
+                                    </Border>
+
+                                    <Border Background="{StaticResource TrackySurfaceStrongBrush}"
+                                            BorderBrush="{StaticResource TrackyBorderBrush}"
+                                            BorderThickness="1"
+                                            CornerRadius="22"
+                                            Padding="18">
+                                        <StackPanel Spacing="12">
+                                            <TextBlock Classes="section-title" Text="Activity" />
+                                            <TextBlock Classes="muted"
+                                                       Text="The timeline records issue creation, comments, state changes, and attachments." />
+
+                                            <TextBlock Classes="muted"
+                                                       IsVisible="{Binding HasNoActivity}"
+                                                       Text="No activity has been recorded for this issue yet." />
+
+                                            <ItemsControl ItemsSource="{Binding Activity}"
+                                                          IsVisible="{Binding HasActivity}">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate x:DataType="vm:IssueActivityViewModel">
+                                                        <Border Background="#FFFDF8"
+                                                                BorderBrush="{StaticResource TrackyBorderBrush}"
+                                                                BorderThickness="1"
+                                                                CornerRadius="16"
+                                                                Margin="0,0,0,10"
+                                                                Padding="14">
+                                                            <StackPanel Spacing="6">
+                                                                <WrapPanel>
+                                                                    <Border Background="{StaticResource TrackyAccentSoftBrush}"
+                                                                            CornerRadius="999"
+                                                                            Padding="8,3">
+                                                                        <TextBlock Text="{Binding EventLabel}"
+                                                                                   Foreground="{StaticResource TrackyAccentBrush}"
+                                                                                   FontWeight="SemiBold" />
+                                                                    </Border>
+                                                                    <TextBlock Classes="muted"
+                                                                               Margin="10,4,0,0"
+                                                                               Text="{Binding CreatedText}" />
+                                                                </WrapPanel>
+                                                                <TextBlock Classes="body"
+                                                                           Text="{Binding Summary}"
+                                                                           TextWrapping="Wrap" />
+                                                            </StackPanel>
+                                                        </Border>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </StackPanel>
+                                    </Border>
+                                </StackPanel>
+                            </DataTemplate>
+                        </ContentControl.ContentTemplate>
+                    </ContentControl>
+                </StackPanel>
+            </ScrollViewer>
+        </Border>
+    </Grid>
+</Window>

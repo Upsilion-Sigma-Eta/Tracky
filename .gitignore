@@ -1,0 +1,35 @@
+# Local agent instructions must stay out of git.
+AGENTS.md
+
+# Build outputs
+bin/
+obj/
+out/
+artifacts/
+TestResults/
+
+# User-specific files
+*.user
+*.suo
+*.userprefs
+*.rsuser
+*.DotSettings.user
+
+# IDE directories
+.vs/
+.vscode/
+.idea/
+
+# NuGet
+packages/
+*.nupkg
+*.snupkg
+
+# Logs and temp files
+*.log
+*.tmp
+*.temp
+
+# OS files
+.DS_Store
+Thumbs.db
