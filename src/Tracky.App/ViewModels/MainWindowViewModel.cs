@@ -13,6 +13,13 @@ namespace Tracky.App.ViewModels;
 
 public sealed class MainWindowViewModel : ViewModelBase, IDisposable
 {
+    private enum RepositoryDetailTab
+    {
+        Issues,
+        Milestones,
+        Projects,
+    }
+
     private const string DefaultProjectSortField = "Board position";
     private const string NoProjectGroupingField = "None";
     private const string DefaultIssueSortOption = "Newest updated";
@@ -60,6 +67,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
 
     private readonly List<IssueCardViewModel> _allIssues = [];
     private readonly List<ProjectSummaryViewModel> _allProjects = [];
+    private readonly List<MilestoneSummary> _allMilestones = [];
     private readonly SemaphoreSlim _loadGate = new(1, 1);
     private readonly SemaphoreSlim _detailLoadGate = new(1, 1);
     private readonly SemaphoreSlim _projectLoadGate = new(1, 1);
@@ -94,6 +102,9 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         ShowProjectTableCommand = new RelayCommand(() => SetProjectViewMode(ProjectViewMode.Table));
         ShowProjectCalendarCommand = new RelayCommand(() => SetProjectViewMode(ProjectViewMode.Calendar));
         ShowProjectTimelineCommand = new RelayCommand(() => SetProjectViewMode(ProjectViewMode.Timeline));
+        ShowRepositoryIssuesCommand = new RelayCommand(() => SetRepositoryDetailTab(RepositoryDetailTab.Issues));
+        ShowRepositoryMilestonesCommand = new RelayCommand(() => SetRepositoryDetailTab(RepositoryDetailTab.Milestones));
+        ShowRepositoryProjectsCommand = new RelayCommand(() => SetRepositoryDetailTab(RepositoryDetailTab.Projects));
         RefreshCommand = new AsyncRelayCommand(RefreshAsync);
         CreateIssueCommand = new AsyncRelayCommand(CreateIssueAsync, CanCreateIssue);
         CreateProjectCommand = new AsyncRelayCommand(CreateProjectAsync, CanCreateProject);
@@ -192,6 +203,12 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
 
     public RelayCommand ShowProjectTimelineCommand { get; }
 
+    public RelayCommand ShowRepositoryIssuesCommand { get; }
+
+    public RelayCommand ShowRepositoryMilestonesCommand { get; }
+
+    public RelayCommand ShowRepositoryProjectsCommand { get; }
+
     public AsyncRelayCommand RefreshCommand { get; }
 
     public AsyncRelayCommand CreateIssueCommand { get; }
@@ -262,6 +279,10 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     public ObservableCollection<IssueCardViewModel> VisibleIssues { get; } = [];
 
     public ObservableCollection<ProjectSummaryViewModel> Projects { get; } = [];
+
+    public ObservableCollection<IssueCardViewModel> RepositoryIssues { get; } = [];
+
+    public ObservableCollection<RepositoryMilestoneViewModel> RepositoryMilestones { get; } = [];
 
     public ObservableCollection<ProjectBoardColumnViewModel> ProjectBoardColumns { get; } = [];
 
@@ -378,6 +399,22 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
 
     public bool IsProjectTimelineViewActive => SelectedProjectViewMode == ProjectViewMode.Timeline;
 
+    public bool IsRepositoryDashboardViewActive => IsProjectsViewActive;
+
+    public bool IsRepositoryIssuesTabActive => _selectedRepositoryDetailTab == RepositoryDetailTab.Issues;
+
+    public bool IsRepositoryMilestonesTabActive => _selectedRepositoryDetailTab == RepositoryDetailTab.Milestones;
+
+    public bool IsRepositoryProjectsTabActive => _selectedRepositoryDetailTab == RepositoryDetailTab.Projects;
+
+    public bool IsRepositoryProjectBoardViewVisible => IsRepositoryProjectsTabActive && IsProjectBoardViewActive;
+
+    public bool IsRepositoryProjectTableViewVisible => IsRepositoryProjectsTabActive && IsProjectTableViewActive;
+
+    public bool IsRepositoryProjectCalendarViewVisible => IsRepositoryProjectsTabActive && IsProjectCalendarViewActive;
+
+    public bool IsRepositoryProjectTimelineViewVisible => IsRepositoryProjectsTabActive && IsProjectTimelineViewActive;
+
     public bool HasSelectedIssue => SelectedIssue is not null;
 
     public bool HasNoSelectedIssue => !HasSelectedIssue;
@@ -395,6 +432,43 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     public bool HasNoSelectedProject => !HasSelectedProject;
 
     public bool HasProjectDetail => ProjectBoardColumns.Count > 0 || ProjectTableItems.Count > 0;
+
+    public bool HasRepositoryIssues => RepositoryIssues.Count > 0;
+
+    public bool HasNoRepositoryIssues => !HasRepositoryIssues;
+
+    public bool HasRepositoryMilestones => RepositoryMilestones.Count > 0;
+
+    public bool HasNoRepositoryMilestones => !HasRepositoryMilestones;
+
+    public string RepositoryIssueCountText => RepositoryIssues.Count == 1
+        ? "1 issue"
+        : $"{RepositoryIssues.Count} issues";
+
+    public string RepositoryMilestoneCountText => RepositoryMilestones.Count == 1
+        ? "1 milestone"
+        : $"{RepositoryMilestones.Count} milestones";
+
+    public string RepositoryProjectViewsText => ProjectSavedViews.Count == 1
+        ? "1 saved project view"
+        : $"{ProjectSavedViews.Count} saved project views";
+
+    public string RepositoryOpenIssuesText => $"{RepositoryIssues.Count(static issue => issue.IsOpen)} Open";
+
+    public string RepositoryClosedIssuesText => $"{RepositoryIssues.Count(static issue => issue.IsClosed)} Closed";
+
+    public string RepositoryProjectsResultsText => $"{ProjectSavedViews.Count} open and 0 closed projects found.";
+
+    public string SelectedRepositoryOwnerName => WorkspaceName;
+
+    public string SelectedRepositoryName => SelectedProject?.Name ?? "Select a repository";
+
+    public string SelectedRepositoryFullName => SelectedProject is null
+        ? $"{WorkspaceName} / Select a repository"
+        : $"{WorkspaceName} / {SelectedProject.Name}";
+
+    public string SelectedRepositoryDescription => SelectedProject?.Description
+        ?? "Select a repository from the dashboard to inspect its issues, milestones, and project views.";
 
     public bool HasSelectedProjectItemForFields => SelectedProjectItemForFields is not null;
 
@@ -446,6 +520,8 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
 
     private ProjectViewMode _selectedProjectViewMode = ProjectViewMode.Board;
 
+    private RepositoryDetailTab _selectedRepositoryDetailTab = RepositoryDetailTab.Issues;
+
     private IssueCardViewModel? _selectedIssue;
 
     private IssueDetailViewModel? _selectedIssueDetail;
@@ -483,6 +559,8 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     private string _projectStatusMessage = "Projects are being prepared from issue metadata.";
 
     private string _projectFilterText = string.Empty;
+
+    private string _repositoryIssueSearchText = string.Empty;
 
     private string _projectSortText = DefaultProjectSortField;
 
@@ -599,7 +677,14 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     public string WorkspaceName
     {
         get => _workspaceName;
-        private set => SetProperty(ref _workspaceName, value);
+        private set
+        {
+            if (SetProperty(ref _workspaceName, value))
+            {
+                OnPropertyChanged(nameof(SelectedRepositoryOwnerName));
+                OnPropertyChanged(nameof(SelectedRepositoryFullName));
+            }
+        }
     }
 
     public string WorkspaceDescription
@@ -623,6 +708,18 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
             {
                 ApplyFilters();
                 SaveIssueSearchCommand.NotifyCanExecuteChanged();
+            }
+        }
+    }
+
+    public string RepositoryIssueSearchText
+    {
+        get => _repositoryIssueSearchText;
+        set
+        {
+            if (SetProperty(ref _repositoryIssueSearchText, value))
+            {
+                RefreshSelectedRepositoryContent();
             }
         }
     }
@@ -750,6 +847,10 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
             OnPropertyChanged(nameof(IsProjectTableViewActive));
             OnPropertyChanged(nameof(IsProjectCalendarViewActive));
             OnPropertyChanged(nameof(IsProjectTimelineViewActive));
+            OnPropertyChanged(nameof(IsRepositoryProjectBoardViewVisible));
+            OnPropertyChanged(nameof(IsRepositoryProjectTableViewVisible));
+            OnPropertyChanged(nameof(IsRepositoryProjectCalendarViewVisible));
+            OnPropertyChanged(nameof(IsRepositoryProjectTimelineViewVisible));
         }
     }
 
@@ -811,6 +912,10 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
 
             OnPropertyChanged(nameof(HasSelectedProject));
             OnPropertyChanged(nameof(HasNoSelectedProject));
+            OnPropertyChanged(nameof(SelectedRepositoryName));
+            OnPropertyChanged(nameof(SelectedRepositoryFullName));
+            OnPropertyChanged(nameof(SelectedRepositoryDescription));
+            RefreshSelectedRepositoryContent();
             CreateProjectCommand.NotifyCanExecuteChanged();
             AddProjectCustomFieldCommand.NotifyCanExecuteChanged();
             AddProjectSavedViewCommand.NotifyCanExecuteChanged();
@@ -1426,12 +1531,25 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
     private void ShowProjects()
     {
         IsProjectsViewActive = true;
+        SetRepositoryDetailTab(RepositoryDetailTab.Issues);
     }
 
     private void SetProjectViewMode(ProjectViewMode viewMode)
     {
         SelectedProjectViewMode = viewMode;
         IsProjectsViewActive = true;
+        SetRepositoryDetailTab(RepositoryDetailTab.Projects);
+    }
+
+    private void SetRepositoryDetailTab(RepositoryDetailTab tab)
+    {
+        if (_selectedRepositoryDetailTab == tab)
+        {
+            return;
+        }
+
+        _selectedRepositoryDetailTab = tab;
+        OnRepositoryTabPropertiesChanged();
     }
 
     private void ShowAll()
@@ -2233,6 +2351,8 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
 
             _allIssues.Clear();
             _allIssues.AddRange(overview.Issues.Select(static issue => new IssueCardViewModel(issue)));
+            _allMilestones.Clear();
+            _allMilestones.AddRange(overview.Milestones);
             _allProjects.Clear();
             _allProjects.AddRange(projectSummaries.Select(static project => new ProjectSummaryViewModel(project)));
             RefreshIssueFilterOptions();
@@ -2456,6 +2576,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         OnPropertyChanged(nameof(HasProjects));
         OnPropertyChanged(nameof(HasNoProjects));
         SelectedProject = SelectPreferredProject([.. Projects], preferredProjectId);
+        RefreshSelectedRepositoryContent();
     }
 
     private void RefreshIssueFilterOptions()
@@ -2627,6 +2748,89 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         OnPropertyChanged(nameof(IsIssueEditorVisible));
         OnPropertyChanged(nameof(IsIssueDetailPlaceholderVisible));
         OnPropertyChanged(nameof(IsSelectedIssueDetailVisible));
+        OnPropertyChanged(nameof(IsRepositoryDashboardViewActive));
+    }
+
+    private void OnRepositoryTabPropertiesChanged()
+    {
+        // Repository 상세 탭은 GitHub 저장소 상단 탭처럼 한 번에 하나만 활성화한다.
+        // Projects 탭 내부의 Board/Table/Calendar/Timeline 상태도 함께 알려야 XAML의 가시성 바인딩이 즉시 갱신된다.
+        OnPropertyChanged(nameof(IsRepositoryIssuesTabActive));
+        OnPropertyChanged(nameof(IsRepositoryMilestonesTabActive));
+        OnPropertyChanged(nameof(IsRepositoryProjectsTabActive));
+        OnPropertyChanged(nameof(IsRepositoryProjectBoardViewVisible));
+        OnPropertyChanged(nameof(IsRepositoryProjectTableViewVisible));
+        OnPropertyChanged(nameof(IsRepositoryProjectCalendarViewVisible));
+        OnPropertyChanged(nameof(IsRepositoryProjectTimelineViewVisible));
+    }
+
+    private void OnRepositoryContentPropertiesChanged()
+    {
+        OnPropertyChanged(nameof(HasRepositoryIssues));
+        OnPropertyChanged(nameof(HasNoRepositoryIssues));
+        OnPropertyChanged(nameof(HasRepositoryMilestones));
+        OnPropertyChanged(nameof(HasNoRepositoryMilestones));
+        OnPropertyChanged(nameof(RepositoryIssueCountText));
+        OnPropertyChanged(nameof(RepositoryMilestoneCountText));
+        OnPropertyChanged(nameof(RepositoryProjectViewsText));
+        OnPropertyChanged(nameof(RepositoryOpenIssuesText));
+        OnPropertyChanged(nameof(RepositoryClosedIssuesText));
+        OnPropertyChanged(nameof(RepositoryProjectsResultsText));
+    }
+
+    private void RefreshSelectedRepositoryContent()
+    {
+        RepositoryIssues.Clear();
+        RepositoryMilestones.Clear();
+
+        if (SelectedProject is null)
+        {
+            OnRepositoryContentPropertiesChanged();
+            return;
+        }
+
+        var repositorySearchQuery = IssueSearchParser.Parse(RepositoryIssueSearchText);
+        var repositoryIssues = _allIssues
+            .Where(issue => issue.HasProject
+                && issue.ProjectText.Equals(SelectedProject.Name, StringComparison.OrdinalIgnoreCase))
+            .Where(issue => MatchesSearch(issue, repositorySearchQuery))
+            .OrderByDescending(static issue => issue.Issue.UpdatedAtUtc)
+            .ThenByDescending(static issue => issue.Number)
+            .ToArray();
+
+        foreach (var issue in repositoryIssues)
+        {
+            RepositoryIssues.Add(issue);
+        }
+
+        // MilestoneSummary는 워크스페이스 전체 집계이므로, Repository 화면에서는 선택한 Repository의 이슈만 다시 묶는다.
+        // 마감일은 같은 이름의 워크스페이스 마일스톤에서 가져와 GitHub식 Repository별 진행률과 due date를 동시에 보여 준다.
+        var milestoneDueDates = _allMilestones.ToDictionary(
+            static milestone => milestone.Name,
+            static milestone => milestone.DueDate,
+            StringComparer.OrdinalIgnoreCase);
+        var repositoryMilestones = repositoryIssues
+            .Where(static issue => issue.HasMilestone)
+            .GroupBy(static issue => issue.MilestoneText, StringComparer.OrdinalIgnoreCase)
+            .Select(group =>
+            {
+                milestoneDueDates.TryGetValue(group.Key, out var dueDate);
+                return new RepositoryMilestoneViewModel(
+                    group.Key,
+                    dueDate,
+                    group.Count(static issue => issue.IsOpen),
+                    group.Count(static issue => issue.IsClosed));
+            })
+            .OrderBy(static milestone => milestone.DueDate is null)
+            .ThenBy(static milestone => milestone.DueDate)
+            .ThenBy(static milestone => milestone.Name, StringComparer.OrdinalIgnoreCase);
+
+        foreach (var milestone in repositoryMilestones)
+        {
+            RepositoryMilestones.Add(milestone);
+        }
+
+        OnRepositoryContentPropertiesChanged();
     }
 
     private void ApplyProjectDetail(ProjectDetail detail)
@@ -2709,6 +2913,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
             : ProjectCustomFields.FirstOrDefault(field => field.Field.Id == selectedFieldId.Value)
                 ?? ProjectCustomFields.FirstOrDefault();
         OnPropertyChanged(nameof(HasProjectDetail));
+        OnRepositoryContentPropertiesChanged();
     }
 
     private void ClearProjectDetail()
@@ -2727,6 +2932,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         SelectedProjectItemForFields = null;
         SelectedProjectCustomField = null;
         OnPropertyChanged(nameof(HasProjectDetail));
+        OnRepositoryContentPropertiesChanged();
     }
 
     private void HydrateCustomFieldValueDraft()

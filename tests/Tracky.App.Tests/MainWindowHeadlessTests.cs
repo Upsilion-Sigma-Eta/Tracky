@@ -112,6 +112,43 @@ public sealed class MainWindowHeadlessTests
     }
 
     [AvaloniaFact]
+    public async Task MainWindow_uses_github_like_single_column_shell_without_left_panel()
+    {
+        var service = TestTrackyWorkspaceService.CreateDefault();
+        var viewModel = new MainWindowViewModel(
+            service,
+            new TestAttachmentPicker(),
+            new TestAttachmentLauncher());
+        var window = new MainWindow
+        {
+            DataContext = viewModel,
+        };
+
+        try
+        {
+            window.Show();
+            await viewModel.InitializeAsync();
+            viewModel.ShowProjectsCommand.Execute(null);
+            await TestWaiter.UntilAsync(
+                () => viewModel.SelectedProject is not null,
+                "The GitHub-like shell did not load a selected repository.");
+
+            window.UpdateLayout();
+
+            var rootGrid = Assert.IsType<Grid>(window.Content);
+            Assert.Single(rootGrid.ColumnDefinitions);
+            Assert.Null(FindTextBlockByText(window, "TRACKY"));
+            Assert.NotNull(FindVisual<TextBlock>(window, "RepositoryOwnerNameText"));
+            Assert.NotNull(FindVisual<Button>(window, "RepositoryIssuesTabButton"));
+            Assert.NotNull(FindVisual<Button>(window, "RepositoryProjectsTabButton"));
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
+    [AvaloniaFact]
     public void IssueHtmlPreview_uses_text_fallback_inside_scroll_viewers()
     {
         var originalDisableWebViewValue = Environment.GetEnvironmentVariable("TRACKY_DISABLE_WEBVIEW");
@@ -148,11 +185,145 @@ public sealed class MainWindowHeadlessTests
         }
     }
 
+    [AvaloniaFact]
+    public async Task Repository_dashboard_exposes_github_like_repository_tabs()
+    {
+        var service = TestTrackyWorkspaceService.CreateDefault();
+        var viewModel = new MainWindowViewModel(
+            service,
+            new TestAttachmentPicker(),
+            new TestAttachmentLauncher());
+        var window = new MainWindow
+        {
+            DataContext = viewModel,
+        };
+
+        try
+        {
+            window.Show();
+            await viewModel.InitializeAsync();
+            viewModel.ShowProjectsCommand.Execute(null);
+            await TestWaiter.UntilAsync(
+                () => viewModel.SelectedProject is not null,
+                "The repository dashboard did not select an issue repository.");
+
+            window.UpdateLayout();
+
+            var repositoryListBox = window.FindControl<ListBox>("RepositoryListBox");
+            var repositoryIssuesTabButton = FindVisual<Button>(window, "RepositoryIssuesTabButton");
+            var repositoryMilestonesTabButton = FindVisual<Button>(window, "RepositoryMilestonesTabButton");
+            var repositoryDiscussionsTabButton = FindVisual<Button>(window, "RepositoryDiscussionsTabButton");
+            var repositoryProjectsTabButton = FindVisual<Button>(window, "RepositoryProjectsTabButton");
+            var repositorySecurityTabButton = FindVisual<Button>(window, "RepositorySecurityTabButton");
+            var repositoryIssuesListBox = FindVisual<ListBox>(window, "RepositoryIssuesListBox");
+            var repositoryOwnerNameText = FindVisual<TextBlock>(window, "RepositoryOwnerNameText");
+            var repositoryNameText = FindVisual<TextBlock>(window, "RepositoryNameText");
+            var repositoryVisibilityBadge = FindVisual<Border>(window, "RepositoryVisibilityBadge");
+            var repositoryWatchButton = FindVisual<Button>(window, "RepositoryWatchButton");
+            var repositoryForkButton = FindVisual<Button>(window, "RepositoryForkButton");
+            var repositoryStarButton = FindVisual<Button>(window, "RepositoryStarButton");
+            var repositoryIssueSearchBox = FindVisual<TextBox>(window, "RepositoryIssueSearchBox");
+            var repositoryLabelsButton = FindVisual<Button>(window, "RepositoryLabelsButton");
+            var repositoryMilestonesButton = FindVisual<Button>(window, "RepositoryMilestonesButton");
+            var repositoryNewIssueButton = FindVisual<Button>(window, "RepositoryNewIssueButton");
+            var repositoryOpenIssuesText = FindVisual<TextBlock>(window, "RepositoryOpenIssuesText");
+            var repositoryClosedIssuesText = FindVisual<TextBlock>(window, "RepositoryClosedIssuesText");
+
+            Assert.NotNull(repositoryListBox);
+            Assert.NotNull(repositoryIssuesTabButton);
+            Assert.Null(repositoryMilestonesTabButton);
+            Assert.NotNull(repositoryDiscussionsTabButton);
+            Assert.NotNull(repositoryProjectsTabButton);
+            Assert.NotNull(repositorySecurityTabButton);
+            Assert.NotNull(repositoryIssuesListBox);
+            Assert.NotNull(repositoryOwnerNameText);
+            Assert.NotNull(repositoryNameText);
+            Assert.NotNull(repositoryVisibilityBadge);
+            Assert.Null(repositoryWatchButton);
+            Assert.Null(repositoryForkButton);
+            Assert.Null(repositoryStarButton);
+            Assert.NotNull(repositoryIssueSearchBox);
+            Assert.NotNull(repositoryLabelsButton);
+            Assert.NotNull(repositoryMilestonesButton);
+            Assert.NotNull(repositoryNewIssueButton);
+            Assert.NotNull(repositoryOpenIssuesText);
+            Assert.NotNull(repositoryClosedIssuesText);
+            Assert.Same(viewModel.Projects, repositoryListBox.ItemsSource);
+            Assert.Same(viewModel.RepositoryIssues, repositoryIssuesListBox.ItemsSource);
+
+            repositoryMilestonesButton.Command?.Execute(repositoryMilestonesButton.CommandParameter);
+            window.UpdateLayout();
+            var repositoryMilestonesPanel = FindVisual<ItemsControl>(window, "RepositoryMilestonesPanel");
+            var repositoryMilestonesOpenText = FindVisual<TextBlock>(window, "RepositoryMilestonesOpenText");
+            var repositoryMilestonesClosedText = FindVisual<TextBlock>(window, "RepositoryMilestonesClosedText");
+            var repositoryMilestonesSortButton = FindVisual<Button>(window, "RepositoryMilestonesSortButton");
+            Assert.NotNull(repositoryMilestonesPanel);
+            Assert.NotNull(repositoryMilestonesOpenText);
+            Assert.NotNull(repositoryMilestonesClosedText);
+            Assert.NotNull(repositoryMilestonesSortButton);
+
+            repositoryProjectsTabButton.Command?.Execute(repositoryProjectsTabButton.CommandParameter);
+            window.UpdateLayout();
+            var repositoryProjectsContent = FindVisual<ContentControl>(window, "RepositoryProjectsContent");
+            var repositoryProjectsSearchBox = FindVisual<TextBox>(window, "RepositoryProjectsSearchBox");
+            var repositoryProjectsResultsText = FindVisual<TextBlock>(window, "RepositoryProjectsResultsText");
+            Assert.NotNull(repositoryProjectsContent);
+            Assert.NotNull(repositoryProjectsSearchBox);
+            Assert.NotNull(repositoryProjectsResultsText);
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
+    [AvaloniaFact]
+    public async Task Repository_screen_goes_directly_from_github_header_to_repository_content()
+    {
+        var service = TestTrackyWorkspaceService.CreateDefault();
+        var viewModel = new MainWindowViewModel(
+            service,
+            new TestAttachmentPicker(),
+            new TestAttachmentLauncher());
+        var window = new MainWindow
+        {
+            DataContext = viewModel,
+        };
+
+        try
+        {
+            window.Show();
+            await viewModel.InitializeAsync();
+            viewModel.ShowProjectsCommand.Execute(null);
+            await TestWaiter.UntilAsync(
+                () => viewModel.SelectedProject is not null,
+                "The repository screen did not select an issue repository.");
+
+            window.UpdateLayout();
+
+            Assert.NotNull(window.FindControl<ListBox>("RepositoryListBox"));
+            Assert.NotNull(FindVisual<TextBox>(window, "RepositoryIssueSearchBox"));
+            Assert.Null(FindTextBlockByText(window, "Repository Dashboard"));
+            Assert.Null(FindTextBlockByText(window, "Selected Repository"));
+        }
+        finally
+        {
+            window.Close();
+        }
+    }
+
     private static T? FindVisual<T>(Control root, string name)
         where T : Control
     {
         return root.GetVisualDescendants()
             .OfType<T>()
             .FirstOrDefault(control => control.Name == name);
+    }
+
+    private static TextBlock? FindTextBlockByText(Control root, string text)
+    {
+        return root.GetVisualDescendants()
+            .OfType<TextBlock>()
+            .FirstOrDefault(control => string.Equals(control.Text, text, StringComparison.Ordinal));
     }
 }

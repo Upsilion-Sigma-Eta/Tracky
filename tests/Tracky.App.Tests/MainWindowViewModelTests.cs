@@ -345,6 +345,52 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
+    public async Task Repository_dashboard_filters_issues_milestones_and_project_views_by_selected_repository()
+    {
+        var viewModel = CreateViewModel(out _, out _);
+
+        await viewModel.InitializeAsync();
+        viewModel.DraftProjectName = "Tracky Foundation";
+        viewModel.DraftTitle = "Repository scoped milestone issue";
+        viewModel.DraftMilestoneName = "MVP Readiness";
+        viewModel.DraftIssueTypeName = "Bug";
+        await viewModel.CreateIssueCommand.ExecuteAsync();
+
+        viewModel.ShowProjectsCommand.Execute(null);
+        await TestWaiter.UntilAsync(
+            () => viewModel.SelectedProject?.Name == "Tracky Foundation"
+                && viewModel.RepositoryIssues.Count > 0
+                && viewModel.RepositoryMilestones.Count > 0,
+            "The repository dashboard did not load repository-scoped issues and milestones.");
+
+        Assert.True(viewModel.IsRepositoryDashboardViewActive);
+        Assert.True(viewModel.IsRepositoryIssuesTabActive);
+        Assert.Equal($"{viewModel.WorkspaceName} / Tracky Foundation", viewModel.SelectedRepositoryFullName);
+        Assert.All(viewModel.RepositoryIssues, issue => Assert.Equal("Tracky Foundation", issue.ProjectText));
+        Assert.DoesNotContain(viewModel.RepositoryIssues, issue => issue.ProjectText == "Tracky Tests");
+        Assert.Contains("Open", viewModel.RepositoryOpenIssuesText, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Closed", viewModel.RepositoryClosedIssuesText, StringComparison.OrdinalIgnoreCase);
+
+        viewModel.RepositoryIssueSearchText = "type:Bug";
+        Assert.Single(viewModel.RepositoryIssues);
+        Assert.Equal("Repository scoped milestone issue", viewModel.RepositoryIssues[0].Title);
+        viewModel.RepositoryIssueSearchText = string.Empty;
+
+        var milestone = Assert.Single(viewModel.RepositoryMilestones, item => item.Name == "MVP Readiness");
+        Assert.True(milestone.OpenIssues >= 1);
+        Assert.Contains("open", milestone.ProgressText, StringComparison.OrdinalIgnoreCase);
+
+        viewModel.ShowRepositoryMilestonesCommand.Execute(null);
+        Assert.True(viewModel.IsRepositoryMilestonesTabActive);
+        Assert.False(viewModel.IsRepositoryIssuesTabActive);
+
+        viewModel.ShowRepositoryProjectsCommand.Execute(null);
+        Assert.True(viewModel.IsRepositoryProjectsTabActive);
+        Assert.True(viewModel.IsRepositoryProjectBoardViewVisible);
+        Assert.NotEmpty(viewModel.ProjectBoardColumns);
+    }
+
+    [Fact]
     public async Task Create_project_selects_the_new_project_shell()
     {
         var viewModel = CreateViewModel(out _, out _);

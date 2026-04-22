@@ -421,77 +421,9 @@
         </Style>
     </Window.Styles>
 
-    <Grid ColumnDefinitions="236,*,0" ColumnSpacing="20" Margin="20">
-        <!-- 왼쪽 앱 셸은 이후 Projects, Labels, Saved Views를 붙일 수 있도록 구조만 먼저 고정한다. -->
-        <Border Grid.Column="0"
-                Background="{StaticResource TrackyNavBrush}"
-                CornerRadius="12"
-                Padding="20">
-            <Grid RowDefinitions="Auto,Auto,*,Auto" RowSpacing="18">
-                <StackPanel Spacing="4">
-                    <TextBlock Text="TRACKY"
-                               FontSize="30"
-                               FontWeight="Black"
-                               Foreground="{StaticResource TrackyNavInkBrush}" />
-                    <TextBlock Text="Phase 3 Productivity"
-                               Foreground="{StaticResource TrackyNavMutedInkBrush}" />
-                </StackPanel>
-
-                <Border Grid.Row="1"
-                        Background="{StaticResource TrackyNavHoverBrush}"
-                        BorderBrush="{StaticResource TrackyNavBorderBrush}"
-                        BorderThickness="1"
-                        CornerRadius="10"
-                        Padding="16">
-                    <StackPanel Spacing="8">
-                        <TextBlock Text="{Binding WorkspaceName}"
-                                   FontSize="18"
-                                   FontWeight="SemiBold"
-                                   Foreground="{StaticResource TrackyNavInkBrush}" />
-                        <TextBlock Text="{Binding WorkspaceDescription}"
-                                   TextWrapping="Wrap"
-                                   Foreground="{StaticResource TrackyNavMutedInkBrush}" />
-                    </StackPanel>
-                </Border>
-
-                <StackPanel Grid.Row="2" Spacing="10">
-                    <TextBlock Text="Navigate"
-                               FontSize="12"
-                               Foreground="{StaticResource TrackyNavMutedInkBrush}" />
-                    <Button Classes="nav-item"
-                            Classes.active="{Binding IsIssuesViewActive}"
-                            Command="{Binding ShowIssuesCommand}"
-                            Content="All Issues" />
-                    <Button Classes="nav-item"
-                            Classes.active="{Binding IsProjectsViewActive}"
-                            Command="{Binding ShowProjectsCommand}"
-                            Content="Projects" />
-                    <Button Classes="nav-item" Content="Labels" IsEnabled="False" />
-                    <Button Classes="nav-item" Content="Milestones" IsEnabled="False" />
-                    <Button Classes="nav-item" Content="Saved Views" IsEnabled="False" />
-                    <Button Classes="nav-item" Content="Reports" IsEnabled="False" />
-                </StackPanel>
-
-                <Border Grid.Row="3"
-                        Background="{StaticResource TrackyNavHoverBrush}"
-                        BorderBrush="{StaticResource TrackyNavBorderBrush}"
-                        BorderThickness="1"
-                        CornerRadius="10"
-                        Padding="16">
-                    <StackPanel Spacing="6">
-                        <TextBlock Text="Local-first workspace"
-                                   FontSize="14"
-                                   FontWeight="SemiBold"
-                                   Foreground="{StaticResource TrackyNavInkBrush}" />
-                        <TextBlock Text="The seeded SQLite file gives us a realistic Phase 1 home screen before full issue CRUD is expanded."
-                                   TextWrapping="Wrap"
-                                   Foreground="{StaticResource TrackyNavMutedInkBrush}" />
-                    </StackPanel>
-                </Border>
-            </Grid>
-        </Border>
-
-        <Grid Grid.Column="1"
+    <!-- GitHub repository 화면처럼 왼쪽 앱 셸을 두지 않고, 상단 repository header와 tab navigation을 기본 조작 경로로 삼는다. -->
+    <Grid ColumnDefinitions="*" ColumnSpacing="0" Margin="0">
+        <Grid Grid.Column="0"
               RowDefinitions="Auto,Auto,*,Auto"
               RowSpacing="16"
               IsVisible="{Binding IsIssueListViewVisible}">
@@ -534,7 +466,7 @@
                         <Button Classes="github-tab"
                                 Classes.active="{Binding IsProjectsViewActive}"
                                 Command="{Binding ShowProjectsCommand}"
-                                Content="Projects" />
+                                Content="Repositories" />
                         <Button Classes="github-tab" Content="Milestones" IsEnabled="False" />
                         <Button Classes="github-tab" Content="Insights" IsEnabled="False" />
                     </StackPanel>
@@ -866,7 +798,7 @@
             </Grid>
         </Grid>
 
-        <Grid Grid.Column="1"
+        <Grid Grid.Column="0"
               RowDefinitions="Auto,*"
               RowSpacing="16"
               IsVisible="{Binding IsIssueDetailViewActive}">
@@ -1351,138 +1283,374 @@
             </Grid>
         </Grid>
 
-        <Grid Grid.Column="1"
-              RowDefinitions="Auto,Auto,*,Auto"
+        <Grid Grid.Column="0"
+              RowDefinitions="Auto,*,Auto"
               RowSpacing="18"
               IsVisible="{Binding IsProjectsViewActive}">
-            <Border Classes="surface" Padding="24">
-                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="20">
-                    <StackPanel Spacing="8">
-                        <TextBlock Classes="hero-title" Text="Projects" />
-                        <TextBlock Classes="body"
-                                   Text="Project data now comes from Project and ProjectItem records synchronized with issue metadata."
-                                   TextWrapping="Wrap" />
-                        <TextBlock Classes="mono"
-                                   Text="{Binding ProjectStatusMessage}"
-                                   TextWrapping="Wrap" />
-                        <Grid ColumnDefinitions="230,170,170,*" ColumnSpacing="10">
-                            <TextBox x:Name="ProjectFilterBox"
-                                     Classes="search-box"
-                                     PlaceholderText="is:open priority:high impact:high"
-                                     Text="{Binding ProjectFilterText, UpdateSourceTrigger=PropertyChanged}" />
-                            <ComboBox Grid.Column="1"
-                                      ItemsSource="{Binding AvailableProjectSortFields}"
-                                      SelectedItem="{Binding ProjectSortText}" />
-                            <ComboBox Grid.Column="2"
-                                      ItemsSource="{Binding AvailableProjectGroupFields}"
-                                      SelectedItem="{Binding ProjectGroupByText}" />
-                            <TextBlock Grid.Column="3"
-                                       Classes="muted"
-                                       VerticalAlignment="Center"
-                                       Text="{Binding ProjectArrangementText}" />
-                        </Grid>
+            <Border Background="{StaticResource TrackySurfaceStrongBrush}"
+                    BorderBrush="{StaticResource TrackyBorderBrush}"
+                    BorderThickness="0,0,0,1"
+                    Padding="20,18,20,0">
+                <Grid RowDefinitions="Auto,Auto,Auto" RowSpacing="14">
+                    <!-- Tracky는 아직 Git 원격 저장소와 통합하지 않으므로 Watch/Fork/Star 같은 GitHub 원격 액션은 노출하지 않습니다. -->
+                    <Grid>
+                        <WrapPanel VerticalAlignment="Center">
+                            <TextBlock x:Name="RepositoryOwnerNameText"
+                                       Text="{Binding SelectedRepositoryOwnerName}"
+                                       FontSize="20"
+                                       Foreground="{StaticResource TrackyAccentBrush}" />
+                            <TextBlock Text=" / "
+                                       FontSize="20"
+                                       Foreground="{StaticResource TrackyMutedInkBrush}" />
+                            <TextBlock x:Name="RepositoryNameText"
+                                       Text="{Binding SelectedRepositoryName}"
+                                       FontSize="20"
+                                       FontWeight="SemiBold"
+                                       Foreground="{StaticResource TrackyAccentBrush}" />
+                            <Border x:Name="RepositoryVisibilityBadge"
+                                    Background="Transparent"
+                                    BorderBrush="{StaticResource TrackyBorderBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="999"
+                                    Margin="10,2,0,0"
+                                    Padding="7,1">
+                                <TextBlock Classes="muted"
+                                           FontSize="12"
+                                           FontWeight="SemiBold"
+                                           Text="Local" />
+                            </Border>
+                        </WrapPanel>
+                    </Grid>
+
+                    <StackPanel Grid.Row="1"
+                                Orientation="Horizontal"
+                                Spacing="2">
+                        <Button Classes="github-tab" Content="Code" IsEnabled="False" />
+                        <Button x:Name="RepositoryIssuesTabButton"
+                                Classes="github-tab"
+                                Classes.active="{Binding IsRepositoryIssuesTabActive}"
+                                Command="{Binding ShowRepositoryIssuesCommand}"
+                                Content="{Binding RepositoryIssueCountText, StringFormat='Issues  {0}'}" />
+                        <Button Classes="github-tab" Content="Pull requests" IsEnabled="False" />
+                        <Button x:Name="RepositoryDiscussionsTabButton"
+                                Classes="github-tab"
+                                Content="Discussions"
+                                IsEnabled="False" />
+                        <Button Classes="github-tab" Content="Actions" IsEnabled="False" />
+                        <Button x:Name="RepositoryProjectsTabButton"
+                                Classes="github-tab"
+                                Classes.active="{Binding IsRepositoryProjectsTabActive}"
+                                Command="{Binding ShowRepositoryProjectsCommand}"
+                                Content="Projects" />
+                        <Button x:Name="RepositorySecurityTabButton"
+                                Classes="github-tab"
+                                Content="Security and quality"
+                                IsEnabled="False" />
+                        <Button Classes="github-tab" Content="Insights" IsEnabled="False" />
                     </StackPanel>
 
-                    <StackPanel Grid.Column="1"
-                                Orientation="Horizontal"
-                                Spacing="10"
-                                VerticalAlignment="Center">
-                        <Button Classes="scope-chip"
-                                Classes.active="{Binding IsProjectBoardViewActive}"
-                                Command="{Binding ShowProjectBoardCommand}"
-                                Content="Board" />
-                        <Button Classes="scope-chip"
-                                Classes.active="{Binding IsProjectTableViewActive}"
-                                Command="{Binding ShowProjectTableCommand}"
-                                Content="Table" />
-                        <Button Classes="scope-chip"
-                                Classes.active="{Binding IsProjectCalendarViewActive}"
-                                Command="{Binding ShowProjectCalendarCommand}"
-                                Content="Calendar" />
-                        <Button Classes="scope-chip"
-                                Classes.active="{Binding IsProjectTimelineViewActive}"
-                                Command="{Binding ShowProjectTimelineCommand}"
-                                Content="Timeline" />
-                    </StackPanel>
+                    <!-- GitHub 저장소 화면처럼 별도 대시보드 카드를 두지 않고, 로컬 Issue Repository 전환만 낮은 헤더 행으로 유지합니다. -->
+                    <ListBox x:Name="RepositoryListBox"
+                             Grid.Row="2"
+                             ItemsSource="{Binding Projects}"
+                             SelectedItem="{Binding SelectedProject, Mode=TwoWay}"
+                             Background="Transparent"
+                             BorderThickness="0"
+                             ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                             ScrollViewer.VerticalScrollBarVisibility="Disabled">
+                        <ListBox.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <StackPanel Orientation="Horizontal" Spacing="8" />
+                            </ItemsPanelTemplate>
+                        </ListBox.ItemsPanel>
+                        <ListBox.ItemTemplate>
+                            <DataTemplate x:DataType="vm:ProjectSummaryViewModel">
+                                <Border Background="{StaticResource TrackySurfaceBrush}"
+                                        BorderBrush="{StaticResource TrackyBorderBrush}"
+                                        BorderThickness="1"
+                                        CornerRadius="6"
+                                        MinWidth="260"
+                                        MaxWidth="340"
+                                        Padding="12,10">
+                                    <Grid RowDefinitions="Auto,Auto" RowSpacing="4">
+                                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                                            <TextBlock Text="{Binding Name}"
+                                                       FontSize="14"
+                                                       FontWeight="SemiBold"
+                                                       Foreground="{StaticResource TrackyInkBrush}"
+                                                       TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Grid.Column="1"
+                                                       Classes="muted"
+                                                       Text="{Binding IssueCountText}" />
+                                        </Grid>
+                                        <TextBlock Grid.Row="1"
+                                                   Classes="muted"
+                                                   Text="{Binding UpdatedText}" />
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
                 </Grid>
             </Border>
 
-            <Grid Grid.Row="1" ColumnDefinitions="*,*" ColumnSpacing="14">
-                <Border Classes="surface" Padding="18">
-                    <Grid RowDefinitions="Auto,*" RowSpacing="12">
-                        <TextBlock Classes="section-title" Text="Project List" />
-                        <ListBox x:Name="ProjectListBox"
-                                 Grid.Row="1"
-                                 ItemsSource="{Binding Projects}"
-                                 SelectedItem="{Binding SelectedProject, Mode=TwoWay}"
-                                 Background="Transparent"
-                                 BorderThickness="0">
-                            <ListBox.ItemTemplate>
-                                <DataTemplate x:DataType="vm:ProjectSummaryViewModel">
+            <Border Grid.Row="1" Classes="surface" Padding="0">
+                <Grid RowDefinitions="Auto,Auto,*">
+                    <Grid ColumnDefinitions="*,Auto,Auto,Auto"
+                          ColumnSpacing="8"
+                          Margin="16,16,16,12">
+                        <TextBox x:Name="RepositoryIssueSearchBox"
+                                 Classes="search-box"
+                                 PlaceholderText="is:issue state:open"
+                                 Text="{Binding RepositoryIssueSearchText, UpdateSourceTrigger=PropertyChanged}"
+                                 IsVisible="{Binding IsRepositoryIssuesTabActive}" />
+                        <Button x:Name="RepositoryLabelsButton"
+                                Grid.Column="1"
+                                Classes="secondary"
+                                Content="Labels"
+                                IsVisible="{Binding IsRepositoryIssuesTabActive}" />
+                        <Button x:Name="RepositoryMilestonesButton"
+                                Grid.Column="2"
+                                Classes="secondary"
+                                Command="{Binding ShowRepositoryMilestonesCommand}"
+                                Content="Milestones"
+                                IsVisible="{Binding IsRepositoryIssuesTabActive}" />
+                        <Button x:Name="RepositoryNewIssueButton"
+                                Grid.Column="3"
+                                Classes="primary"
+                                Command="{Binding PrepareNewIssueCommand}"
+                                Content="New issue"
+                                IsVisible="{Binding IsRepositoryIssuesTabActive}" />
+
+                        <!-- GitHub Milestones 목록의 상단 상태/정렬 행을 따라 Open, Closed, Sort를 먼저 노출합니다. -->
+                        <Grid Grid.ColumnSpan="4"
+                              ColumnDefinitions="Auto,Auto,*,Auto"
+                              ColumnSpacing="16"
+                              IsVisible="{Binding IsRepositoryMilestonesTabActive}">
+                            <TextBlock x:Name="RepositoryMilestonesOpenText"
+                                       Classes="body"
+                                       FontWeight="SemiBold"
+                                       VerticalAlignment="Center"
+                                       Text="{Binding RepositoryMilestoneCountText, StringFormat='Open {0}'}" />
+                            <TextBlock x:Name="RepositoryMilestonesClosedText"
+                                       Grid.Column="1"
+                                       Classes="muted"
+                                       VerticalAlignment="Center"
+                                       Text="Closed 0" />
+                            <Button x:Name="RepositoryMilestonesSortButton"
+                                    Grid.Column="3"
+                                    Classes="secondary"
+                                    Content="Sort" />
+                        </Grid>
+                    </Grid>
+
+                    <Border Grid.Row="1"
+                            Background="{StaticResource TrackySurfaceStrongBrush}"
+                            BorderBrush="{StaticResource TrackyBorderBrush}"
+                            BorderThickness="0,1,0,1"
+                            Padding="16,10"
+                            IsVisible="{Binding IsRepositoryIssuesTabActive}">
+                        <Grid ColumnDefinitions="Auto,Auto,*"
+                              ColumnSpacing="16">
+                            <TextBlock x:Name="RepositoryOpenIssuesText"
+                                       Classes="body"
+                                       FontWeight="SemiBold"
+                                       Text="{Binding RepositoryOpenIssuesText}" />
+                            <TextBlock x:Name="RepositoryClosedIssuesText"
+                                       Grid.Column="1"
+                                       Classes="muted"
+                                       Text="{Binding RepositoryClosedIssuesText}" />
+                        </Grid>
+                    </Border>
+
+                    <ListBox x:Name="RepositoryIssuesListBox"
+                             Grid.Row="2"
+                             ItemsSource="{Binding RepositoryIssues}"
+                             SelectedItem="{Binding SelectedIssue, Mode=TwoWay}"
+                             IsVisible="{Binding IsRepositoryIssuesTabActive}"
+                             Background="Transparent"
+                             BorderThickness="0">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate x:DataType="vm:IssueCardViewModel">
+                                <Border Classes="issue-row"
+                                        BorderBrush="{Binding CardBorderBrush}">
+                                    <Grid ColumnDefinitions="28,*,Auto" ColumnSpacing="12">
+                                        <Border Width="20"
+                                                Height="20"
+                                                CornerRadius="10"
+                                                Background="{Binding StateIconBackground}"
+                                                VerticalAlignment="Top">
+                                            <TextBlock HorizontalAlignment="Center"
+                                                       VerticalAlignment="Center"
+                                                       FontSize="12"
+                                                       FontWeight="Bold"
+                                                       Foreground="{Binding StateIconForeground}"
+                                                       Text="{Binding StateIconText}" />
+                                        </Border>
+
+                                        <StackPanel Grid.Column="1" Spacing="6">
+                                            <WrapPanel>
+                                                <TextBlock Classes="issue-title"
+                                                           Margin="0,0,8,4"
+                                                           Text="{Binding Title}"
+                                                           TextWrapping="Wrap" />
+                                                <Border Background="{Binding PriorityBadgeBackground}"
+                                                        CornerRadius="999"
+                                                        Margin="0,0,6,4"
+                                                        Padding="8,2">
+                                                    <TextBlock FontSize="12"
+                                                               FontWeight="SemiBold"
+                                                               Foreground="{Binding PriorityBadgeForeground}"
+                                                               Text="{Binding PriorityText}" />
+                                                </Border>
+                                                <ItemsControl ItemsSource="{Binding LabelChips}"
+                                                              IsVisible="{Binding HasLabels}">
+                                                    <ItemsControl.ItemsPanel>
+                                                        <ItemsPanelTemplate>
+                                                            <WrapPanel />
+                                                        </ItemsPanelTemplate>
+                                                    </ItemsControl.ItemsPanel>
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate x:DataType="vm:LabelChipViewModel">
+                                                            <Border Classes="label-chip"
+                                                                    Background="{Binding Background}"
+                                                                    BorderBrush="{Binding BorderBrush}">
+                                                                <TextBlock Classes="label-chip-text"
+                                                                           Text="{Binding Name}"
+                                                                           Foreground="{Binding Foreground}" />
+                                                            </Border>
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+                                            </WrapPanel>
+
+                                            <TextBlock Classes="muted"
+                                                       Text="{Binding GitHubListMetaText}" />
+                                            <WrapPanel>
+                                                <TextBlock Classes="muted"
+                                                           Margin="0,0,12,0"
+                                                           Text="{Binding GitHubListSecondaryText}" />
+                                                <Border Background="{Binding DueBadgeBackground}"
+                                                        CornerRadius="999"
+                                                        Padding="8,2"
+                                                        IsVisible="{Binding HasDueDate}">
+                                                    <TextBlock FontSize="12"
+                                                               FontWeight="SemiBold"
+                                                               Foreground="{Binding DueBadgeForeground}"
+                                                               Text="{Binding DueText}" />
+                                                </Border>
+                                            </WrapPanel>
+                                        </StackPanel>
+
+                                        <StackPanel Grid.Column="2"
+                                                    Orientation="Horizontal"
+                                                    Spacing="12"
+                                                    VerticalAlignment="Top">
+                                            <TextBlock Classes="muted"
+                                                       IsVisible="{Binding HasComments}"
+                                                       Text="{Binding CommentBadgeText, StringFormat='Comments {0}'}" />
+                                            <TextBlock Classes="muted"
+                                                       IsVisible="{Binding HasAttachments}"
+                                                       Text="{Binding AttachmentsText}" />
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+
+                    <ScrollViewer Grid.Row="2"
+                                  IsVisible="{Binding IsRepositoryMilestonesTabActive}">
+                        <ItemsControl x:Name="RepositoryMilestonesPanel"
+                                      ItemsSource="{Binding RepositoryMilestones}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:RepositoryMilestoneViewModel">
                                     <Border Background="{StaticResource TrackySurfaceStrongBrush}"
                                             BorderBrush="{StaticResource TrackyBorderBrush}"
                                             BorderThickness="1"
-                                            CornerRadius="18"
+                                            CornerRadius="8"
                                             Margin="0,0,0,10"
-                                            Padding="14">
-                                        <StackPanel Spacing="6">
-                                            <TextBlock Text="{Binding Name}"
-                                                       FontSize="17"
-                                                       FontWeight="SemiBold"
-                                                       Foreground="{StaticResource TrackyInkBrush}" />
-                                            <TextBlock Classes="muted"
-                                                       Text="{Binding Description}"
-                                                       TextWrapping="Wrap" />
-                                            <WrapPanel>
-                                                <TextBlock Classes="muted"
-                                                           Margin="0,0,14,0"
+                                            Padding="16">
+                                        <Grid RowDefinitions="Auto,Auto,Auto" RowSpacing="10">
+                                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                                                <StackPanel Spacing="3">
+                                                    <TextBlock Text="{Binding Name}"
+                                                               FontSize="17"
+                                                               FontWeight="SemiBold"
+                                                               Foreground="{StaticResource TrackyInkBrush}" />
+                                                    <TextBlock Classes="muted"
+                                                               Text="{Binding DueText}" />
+                                                </StackPanel>
+                                                <TextBlock Grid.Column="1"
+                                                           Classes="muted"
+                                                           VerticalAlignment="Center"
                                                            Text="{Binding IssueCountText}" />
+                                            </Grid>
+
+                                            <ProgressBar Grid.Row="1"
+                                                         Minimum="0"
+                                                         Maximum="100"
+                                                         Height="8"
+                                                         Value="{Binding CompletionPercent}" />
+
+                                            <Grid Grid.Row="2" ColumnDefinitions="*,Auto">
                                                 <TextBlock Classes="muted"
-                                                           Margin="0,0,14,0"
                                                            Text="{Binding ProgressText}" />
-                                                <TextBlock Classes="muted"
-                                                           Text="{Binding UpdatedText}" />
-                                            </WrapPanel>
-                                        </StackPanel>
+                                                <TextBlock Grid.Column="1"
+                                                           Classes="muted"
+                                                           Text="{Binding CompletionText}" />
+                                            </Grid>
+                                        </Grid>
                                     </Border>
                                 </DataTemplate>
-                            </ListBox.ItemTemplate>
-                        </ListBox>
-                    </Grid>
-                </Border>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
 
-                <Border Grid.Column="1" Classes="surface" Padding="18">
-                    <StackPanel Spacing="10">
-                        <TextBlock Classes="section-title" Text="Selected Project" />
-                        <TextBlock Classes="muted"
-                                   IsVisible="{Binding HasNoSelectedProject}"
-                                   Text="No project is selected." />
-                        <StackPanel Spacing="8" IsVisible="{Binding HasSelectedProject}">
-                            <TextBlock Text="{Binding SelectedProject.Name}"
-                                       FontSize="20"
-                                       FontWeight="SemiBold"
-                                       Foreground="{StaticResource TrackyInkBrush}" />
-                            <TextBlock Classes="body"
-                                       Text="{Binding SelectedProject.Description}"
-                                       TextWrapping="Wrap" />
-                            <WrapPanel>
-                                <TextBlock Classes="muted"
-                                           Margin="0,0,16,0"
-                                           Text="{Binding SelectedProject.IssueCountText}" />
-                                <TextBlock Classes="muted"
-                                           Margin="0,0,16,0"
-                                           Text="{Binding SelectedProject.ProgressText}" />
-                                <TextBlock Classes="muted"
-                                           Text="{Binding SelectedProject.UpdatedText}" />
-                            </WrapPanel>
-                        </StackPanel>
-                    </StackPanel>
-                </Border>
-            </Grid>
+                    <ContentControl x:Name="RepositoryProjectsContent"
+                                    Grid.Row="2"
+                                    IsVisible="{Binding IsRepositoryProjectsTabActive}">
+                        <Grid RowDefinitions="Auto,*" RowSpacing="14">
+                            <Grid ColumnDefinitions="240,150,150,*,Auto"
+                                  ColumnSpacing="8">
+                                <TextBox x:Name="RepositoryProjectsSearchBox"
+                                         Classes="search-box"
+                                         PlaceholderText="Search all projects"
+                                         Text="{Binding ProjectFilterText, UpdateSourceTrigger=PropertyChanged}" />
+                                <ComboBox Grid.Column="1"
+                                          ItemsSource="{Binding AvailableProjectSortFields}"
+                                          SelectedItem="{Binding ProjectSortText}" />
+                                <ComboBox Grid.Column="2"
+                                          ItemsSource="{Binding AvailableProjectGroupFields}"
+                                          SelectedItem="{Binding ProjectGroupByText}" />
+                                <TextBlock x:Name="RepositoryProjectsResultsText"
+                                           Grid.Column="3"
+                                           Classes="muted"
+                                           VerticalAlignment="Center"
+                                           Text="{Binding RepositoryProjectsResultsText}" />
+                                <StackPanel Grid.Column="4"
+                                            Orientation="Horizontal"
+                                            Spacing="8">
+                                    <Button Classes="scope-chip"
+                                            Classes.active="{Binding IsProjectBoardViewActive}"
+                                            Command="{Binding ShowProjectBoardCommand}"
+                                            Content="Board" />
+                                    <Button Classes="scope-chip"
+                                            Classes.active="{Binding IsProjectTableViewActive}"
+                                            Command="{Binding ShowProjectTableCommand}"
+                                            Content="Table" />
+                                    <Button Classes="scope-chip"
+                                            Classes.active="{Binding IsProjectCalendarViewActive}"
+                                            Command="{Binding ShowProjectCalendarCommand}"
+                                            Content="Calendar" />
+                                    <Button Classes="scope-chip"
+                                            Classes.active="{Binding IsProjectTimelineViewActive}"
+                                            Command="{Binding ShowProjectTimelineCommand}"
+                                            Content="Timeline" />
+                                </StackPanel>
+                            </Grid>
 
-            <Border Grid.Row="2" Classes="surface" Padding="22">
-                <Grid>
-                    <ScrollViewer IsVisible="{Binding IsProjectBoardViewActive}">
+                    <ScrollViewer Grid.Row="1" IsVisible="{Binding IsProjectBoardViewActive}">
                         <ItemsControl ItemsSource="{Binding ProjectBoardColumns}">
                             <ItemsControl.ItemsPanel>
                                 <ItemsPanelTemplate>
@@ -1495,7 +1663,7 @@
                                             Background="{StaticResource TrackySurfaceStrongBrush}"
                                             BorderBrush="{StaticResource TrackyBorderBrush}"
                                             BorderThickness="1"
-                                            CornerRadius="20"
+                                            CornerRadius="8"
                                             Margin="0,0,14,0"
                                             Padding="16">
                                         <Grid RowDefinitions="Auto,*" RowSpacing="12">
@@ -1565,7 +1733,7 @@
                         </ItemsControl>
                     </ScrollViewer>
 
-                    <ScrollViewer IsVisible="{Binding IsProjectTableViewActive}">
+                    <ScrollViewer Grid.Row="1" IsVisible="{Binding IsProjectTableViewActive}">
                         <ItemsControl ItemsSource="{Binding ProjectTableGroups}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate x:DataType="vm:ProjectIssueGroupViewModel">
@@ -1607,7 +1775,7 @@
                         </ItemsControl>
                     </ScrollViewer>
 
-                    <ScrollViewer IsVisible="{Binding IsProjectCalendarViewActive}">
+                    <ScrollViewer Grid.Row="1" IsVisible="{Binding IsProjectCalendarViewActive}">
                         <ItemsControl ItemsSource="{Binding ProjectCalendarGroups}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate x:DataType="vm:ProjectIssueGroupViewModel">
@@ -1646,7 +1814,7 @@
                         </ItemsControl>
                     </ScrollViewer>
 
-                    <ScrollViewer IsVisible="{Binding IsProjectTimelineViewActive}">
+                    <ScrollViewer Grid.Row="1" IsVisible="{Binding IsProjectTimelineViewActive}">
                         <ItemsControl ItemsSource="{Binding ProjectTimelineGroups}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate x:DataType="vm:ProjectIssueGroupViewModel">
@@ -1684,16 +1852,18 @@
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
                     </ScrollViewer>
+                        </Grid>
+                    </ContentControl>
                 </Grid>
             </Border>
 
-            <TextBlock Grid.Row="3"
+            <TextBlock Grid.Row="2"
                        Classes="muted"
                        Text="{Binding ProjectStatusMessage}"
                        TextWrapping="Wrap" />
         </Grid>
 
-        <Border Grid.Column="2" Classes="surface" Padding="20" IsVisible="False">
+        <Border Grid.Column="0" Classes="surface" Padding="20" IsVisible="False">
             <ScrollViewer>
                 <StackPanel Spacing="18">
                     <Border Background="{StaticResource TrackySurfaceStrongBrush}"
