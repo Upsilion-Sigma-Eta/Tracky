@@ -1613,47 +1613,77 @@
                     <ContentControl x:Name="RepositoryProjectsContent"
                                     Grid.Row="2"
                                     IsVisible="{Binding IsRepositoryProjectsTabActive}">
-                        <Grid RowDefinitions="Auto,*" RowSpacing="14">
-                            <Grid ColumnDefinitions="240,150,150,*,Auto"
+                        <Grid RowDefinitions="Auto,Auto,*" RowSpacing="14">
+                            <!-- Saved views sit directly under the repository tabs so Projects feels like the approved repository-shell design. -->
+                            <Border Background="{StaticResource TrackySurfaceStrongBrush}"
+                                    BorderBrush="{StaticResource TrackyBorderBrush}"
+                                    BorderThickness="0,0,0,1"
+                                    Padding="16,0,16,10">
+                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                                    <ItemsControl x:Name="RepositoryProjectSavedViewsTabs"
+                                                  ItemsSource="{Binding ProjectSavedViews}"
+                                                  IsVisible="{Binding HasProjectSavedViews}">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <StackPanel Orientation="Horizontal" Spacing="6" />
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate x:DataType="vm:ProjectSavedViewViewModel">
+                                                <Button Classes="scope-chip"
+                                                        Command="{Binding #RootWindow.((vm:MainWindowViewModel)DataContext).ApplyProjectSavedViewCommand}"
+                                                        CommandParameter="{Binding}"
+                                                        Content="{Binding Name}" />
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                    <TextBlock x:Name="RepositoryProjectsResultsText"
+                                               Grid.Column="1"
+                                               Classes="muted"
+                                               VerticalAlignment="Center"
+                                               Text="{Binding RepositoryProjectViewsText}" />
+                                </Grid>
+                            </Border>
+
+                            <!-- Query, view mode, grouping, sorting, and field controls make Projects work like a repository work surface. -->
+                            <Grid Grid.Row="1"
+                                  ColumnDefinitions="*,Auto,Auto,Auto,150,150,Auto"
                                   ColumnSpacing="8">
                                 <TextBox x:Name="RepositoryProjectsSearchBox"
                                          Classes="search-box"
-                                         PlaceholderText="Search all projects"
+                                         PlaceholderText="is:open status:ready priority:high"
                                          Text="{Binding ProjectFilterText, UpdateSourceTrigger=PropertyChanged}" />
-                                <ComboBox Grid.Column="1"
-                                          ItemsSource="{Binding AvailableProjectSortFields}"
-                                          SelectedItem="{Binding ProjectSortText}" />
-                                <ComboBox Grid.Column="2"
+                                <Button x:Name="RepositoryProjectViewButton"
+                                        Grid.Column="1"
+                                        Classes="secondary"
+                                        Content="View" />
+                                <Button x:Name="RepositoryProjectTableButton"
+                                        Grid.Column="2"
+                                        Classes="scope-chip"
+                                        Classes.active="{Binding IsProjectTableViewActive}"
+                                        Command="{Binding ShowProjectTableCommand}"
+                                        Content="Table" />
+                                <Button x:Name="RepositoryProjectBoardButton"
+                                        Grid.Column="3"
+                                        Classes="scope-chip"
+                                        Classes.active="{Binding IsProjectBoardViewActive}"
+                                        Command="{Binding ShowProjectBoardCommand}"
+                                        Content="Board" />
+                                <ComboBox x:Name="RepositoryProjectGroupComboBox"
+                                          Grid.Column="4"
                                           ItemsSource="{Binding AvailableProjectGroupFields}"
                                           SelectedItem="{Binding ProjectGroupByText}" />
-                                <TextBlock x:Name="RepositoryProjectsResultsText"
-                                           Grid.Column="3"
-                                           Classes="muted"
-                                           VerticalAlignment="Center"
-                                           Text="{Binding RepositoryProjectsResultsText}" />
-                                <StackPanel Grid.Column="4"
-                                            Orientation="Horizontal"
-                                            Spacing="8">
-                                    <Button Classes="scope-chip"
-                                            Classes.active="{Binding IsProjectBoardViewActive}"
-                                            Command="{Binding ShowProjectBoardCommand}"
-                                            Content="Board" />
-                                    <Button Classes="scope-chip"
-                                            Classes.active="{Binding IsProjectTableViewActive}"
-                                            Command="{Binding ShowProjectTableCommand}"
-                                            Content="Table" />
-                                    <Button Classes="scope-chip"
-                                            Classes.active="{Binding IsProjectCalendarViewActive}"
-                                            Command="{Binding ShowProjectCalendarCommand}"
-                                            Content="Calendar" />
-                                    <Button Classes="scope-chip"
-                                            Classes.active="{Binding IsProjectTimelineViewActive}"
-                                            Command="{Binding ShowProjectTimelineCommand}"
-                                            Content="Timeline" />
-                                </StackPanel>
+                                <ComboBox x:Name="RepositoryProjectSortComboBox"
+                                          Grid.Column="5"
+                                          ItemsSource="{Binding AvailableProjectSortFields}"
+                                          SelectedItem="{Binding ProjectSortText}" />
+                                <Button x:Name="RepositoryProjectFieldsButton"
+                                        Grid.Column="6"
+                                        Classes="secondary"
+                                        Content="Fields" />
                             </Grid>
 
-                    <ScrollViewer Grid.Row="1" IsVisible="{Binding IsProjectBoardViewActive}">
+                    <ScrollViewer Grid.Row="2" IsVisible="{Binding IsProjectBoardViewActive}">
                         <ItemsControl ItemsSource="{Binding ProjectBoardColumns}">
                             <ItemsControl.ItemsPanel>
                                 <ItemsPanelTemplate>
@@ -1736,7 +1766,7 @@
                         </ItemsControl>
                     </ScrollViewer>
 
-                    <ScrollViewer Grid.Row="1" IsVisible="{Binding IsProjectTableViewActive}">
+                    <ScrollViewer Grid.Row="2" IsVisible="{Binding IsProjectTableViewActive}">
                         <ItemsControl ItemsSource="{Binding ProjectTableGroups}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate x:DataType="vm:ProjectIssueGroupViewModel">
@@ -1778,7 +1808,7 @@
                         </ItemsControl>
                     </ScrollViewer>
 
-                    <ScrollViewer Grid.Row="1" IsVisible="{Binding IsProjectCalendarViewActive}">
+                    <ScrollViewer Grid.Row="2" IsVisible="{Binding IsProjectCalendarViewActive}">
                         <ItemsControl ItemsSource="{Binding ProjectCalendarGroups}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate x:DataType="vm:ProjectIssueGroupViewModel">
@@ -1817,7 +1847,7 @@
                         </ItemsControl>
                     </ScrollViewer>
 
-                    <ScrollViewer Grid.Row="1" IsVisible="{Binding IsProjectTimelineViewActive}">
+                    <ScrollViewer Grid.Row="2" IsVisible="{Binding IsProjectTimelineViewActive}">
                         <ItemsControl ItemsSource="{Binding ProjectTimelineGroups}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate x:DataType="vm:ProjectIssueGroupViewModel">
@@ -1855,6 +1885,37 @@
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
                     </ScrollViewer>
+
+                    <StackPanel x:Name="RepositoryProjectFieldsPanel"
+                                Grid.Row="2"
+                                Width="280"
+                                HorizontalAlignment="Right"
+                                VerticalAlignment="Top"
+                                Spacing="10"
+                                Margin="0,0,16,16"
+                                IsVisible="{Binding IsRepositoryProjectsTabActive}">
+                        <!-- Custom field editing remains available, but it is visually secondary to the saved view and table/board workflow. -->
+                        <Border Background="{StaticResource TrackySurfaceStrongBrush}"
+                                BorderBrush="{StaticResource TrackyBorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="8"
+                                Padding="12">
+                            <StackPanel Spacing="8">
+                                <TextBlock FontWeight="SemiBold"
+                                           Foreground="{StaticResource TrackyInkBrush}"
+                                           Text="Fields" />
+                                <ComboBox ItemsSource="{Binding ProjectTableItems}"
+                                          SelectedItem="{Binding SelectedProjectItemForFields}" />
+                                <ComboBox ItemsSource="{Binding ProjectCustomFields}"
+                                          SelectedItem="{Binding SelectedProjectCustomField}" />
+                                <TextBox PlaceholderText="Field value"
+                                         Text="{Binding DraftCustomFieldValue, UpdateSourceTrigger=PropertyChanged}" />
+                                <Button Classes="secondary"
+                                        Command="{Binding SaveProjectCustomFieldValueCommand}"
+                                        Content="Save field value" />
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
                         </Grid>
                     </ContentControl>
                 </Grid>
