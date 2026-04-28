@@ -366,7 +366,8 @@ public sealed class MainWindowViewModelTests
             "The repository dashboard did not load repository-scoped issues and milestones.");
 
         Assert.True(viewModel.IsRepositoryDashboardViewActive);
-        Assert.True(viewModel.IsRepositoryIssuesTabActive);
+        Assert.True(viewModel.IsRepositoryProjectsTabActive);
+        Assert.False(viewModel.IsRepositoryIssuesTabActive);
         Assert.Equal($"{viewModel.WorkspaceName} / Tracky Foundation", viewModel.SelectedRepositoryFullName);
         Assert.All(viewModel.RepositoryIssues, issue => Assert.Equal("Tracky Foundation", issue.ProjectText));
         Assert.DoesNotContain(viewModel.RepositoryIssues, issue => issue.ProjectText == "Tracky Tests");
