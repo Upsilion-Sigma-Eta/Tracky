@@ -449,6 +449,14 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         ? "1 milestone"
         : $"{RepositoryMilestones.Count} milestones";
 
+    public string RepositoryProjectCountText => Projects.Count == 1
+        ? "1 project"
+        : $"{Projects.Count} projects";
+
+    public bool HasProjectSavedViews => ProjectSavedViews.Count > 0;
+
+    public bool HasNoProjectSavedViews => !HasProjectSavedViews;
+
     public string RepositoryProjectViewsText => ProjectSavedViews.Count == 1
         ? "1 saved project view"
         : $"{ProjectSavedViews.Count} saved project views";
@@ -2577,6 +2585,7 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
 
         OnPropertyChanged(nameof(HasProjects));
         OnPropertyChanged(nameof(HasNoProjects));
+        OnPropertyChanged(nameof(RepositoryProjectCountText));
         SelectedProject = SelectPreferredProject([.. Projects], preferredProjectId);
         RefreshSelectedRepositoryContent();
     }
@@ -2772,8 +2781,11 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
         OnPropertyChanged(nameof(HasNoRepositoryIssues));
         OnPropertyChanged(nameof(HasRepositoryMilestones));
         OnPropertyChanged(nameof(HasNoRepositoryMilestones));
+        OnPropertyChanged(nameof(HasProjectSavedViews));
+        OnPropertyChanged(nameof(HasNoProjectSavedViews));
         OnPropertyChanged(nameof(RepositoryIssueCountText));
         OnPropertyChanged(nameof(RepositoryMilestoneCountText));
+        OnPropertyChanged(nameof(RepositoryProjectCountText));
         OnPropertyChanged(nameof(RepositoryProjectViewsText));
         OnPropertyChanged(nameof(RepositoryOpenIssuesText));
         OnPropertyChanged(nameof(RepositoryClosedIssuesText));
