@@ -279,6 +279,8 @@ public sealed class MainWindowViewModelTests
 
         Assert.True(viewModel.IsProjectsViewActive);
         Assert.False(viewModel.IsIssuesViewActive);
+        Assert.True(viewModel.IsRepositoryProjectsTabActive);
+        Assert.False(viewModel.IsRepositoryIssuesTabActive);
         Assert.NotEmpty(viewModel.Projects);
         Assert.NotEmpty(viewModel.ProjectTableItems);
         Assert.NotEmpty(viewModel.ProjectCustomFields);

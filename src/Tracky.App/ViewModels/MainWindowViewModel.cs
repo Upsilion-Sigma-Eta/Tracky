@@ -1530,8 +1530,10 @@ public sealed class MainWindowViewModel : ViewModelBase, IDisposable
 
     private void ShowProjects()
     {
+        // Projects is a first-class repository tab in the GitHub-style shell,
+        // so the command must activate both the project screen and the repository Projects tab.
         IsProjectsViewActive = true;
-        SetRepositoryDetailTab(RepositoryDetailTab.Issues);
+        SetRepositoryDetailTab(RepositoryDetailTab.Projects);
     }
 
     private void SetProjectViewMode(ProjectViewMode viewMode)
