@@ -1,6 +1,9 @@
 # Local agent instructions must stay out of git.
 AGENTS.md
 
+# Superpowers brainstorming mockups are local planning artifacts.
+.superpowers/
+
 # Build outputs
 bin/
 obj/
