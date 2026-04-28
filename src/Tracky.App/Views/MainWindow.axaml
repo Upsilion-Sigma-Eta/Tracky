@@ -1292,8 +1292,9 @@
                     BorderThickness="0,0,0,1"
                     Padding="20,18,20,0">
                 <Grid RowDefinitions="Auto,Auto,Auto" RowSpacing="14">
-                    <!-- Tracky는 아직 Git 원격 저장소와 통합하지 않으므로 Watch/Fork/Star 같은 GitHub 원격 액션은 노출하지 않습니다. -->
-                    <Grid>
+                    <!-- The repository header mirrors the familiar Issues/Projects workflow shape,
+                         but uses Tracky's local workspace identity and no GitHub brand assets. -->
+                    <Grid ColumnDefinitions="*,Auto">
                         <WrapPanel VerticalAlignment="Center">
                             <TextBlock x:Name="RepositoryOwnerNameText"
                                        Text="{Binding SelectedRepositoryOwnerName}"
@@ -1320,8 +1321,17 @@
                                            Text="Local" />
                             </Border>
                         </WrapPanel>
+
+                        <Button x:Name="RepositoryNewProjectButton"
+                                Grid.Column="1"
+                                Classes="primary"
+                                Command="{Binding CreateProjectCommand}"
+                                Content="New project"
+                                IsVisible="{Binding IsRepositoryProjectsTabActive}" />
                     </Grid>
 
+                    <!-- Only Issues and Projects are first-class active surfaces. Pull requests is inactive because Tracky has no PR model,
+                         while Milestones and More keep related local tools reachable without taking over the main workflow. -->
                     <StackPanel Grid.Row="1"
                                 Orientation="Horizontal"
                                 Spacing="2">
@@ -1332,21 +1342,20 @@
                                 Command="{Binding ShowRepositoryIssuesCommand}"
                                 Content="{Binding RepositoryIssueCountText, StringFormat='Issues  {0}'}" />
                         <Button Classes="github-tab" Content="Pull requests" IsEnabled="False" />
-                        <Button x:Name="RepositoryDiscussionsTabButton"
-                                Classes="github-tab"
-                                Content="Discussions"
-                                IsEnabled="False" />
-                        <Button Classes="github-tab" Content="Actions" IsEnabled="False" />
                         <Button x:Name="RepositoryProjectsTabButton"
                                 Classes="github-tab"
                                 Classes.active="{Binding IsRepositoryProjectsTabActive}"
                                 Command="{Binding ShowRepositoryProjectsCommand}"
-                                Content="Projects" />
-                        <Button x:Name="RepositorySecurityTabButton"
+                                Content="{Binding RepositoryProjectCountText, StringFormat='Projects  {0}'}" />
+                        <Button x:Name="RepositoryMilestonesTabButton"
                                 Classes="github-tab"
-                                Content="Security and quality"
+                                Classes.active="{Binding IsRepositoryMilestonesTabActive}"
+                                Command="{Binding ShowRepositoryMilestonesCommand}"
+                                Content="Milestones" />
+                        <Button x:Name="RepositoryMoreTabButton"
+                                Classes="github-tab"
+                                Content="More"
                                 IsEnabled="False" />
-                        <Button Classes="github-tab" Content="Insights" IsEnabled="False" />
                     </StackPanel>
 
                     <!-- GitHub 저장소 화면처럼 별도 대시보드 카드를 두지 않고, 로컬 Issue Repository 전환만 낮은 헤더 행으로 유지합니다. -->
@@ -1396,7 +1405,7 @@
 
             <Border Grid.Row="1" Classes="surface" Padding="0">
                 <Grid RowDefinitions="Auto,Auto,*">
-                    <Grid ColumnDefinitions="*,Auto,Auto,Auto"
+                    <Grid ColumnDefinitions="*,Auto,Auto"
                           ColumnSpacing="8"
                           Margin="16,16,16,12">
                         <TextBox x:Name="RepositoryIssueSearchBox"
@@ -1409,21 +1418,15 @@
                                 Classes="secondary"
                                 Content="Labels"
                                 IsVisible="{Binding IsRepositoryIssuesTabActive}" />
-                        <Button x:Name="RepositoryMilestonesButton"
-                                Grid.Column="2"
-                                Classes="secondary"
-                                Command="{Binding ShowRepositoryMilestonesCommand}"
-                                Content="Milestones"
-                                IsVisible="{Binding IsRepositoryIssuesTabActive}" />
                         <Button x:Name="RepositoryNewIssueButton"
-                                Grid.Column="3"
+                                Grid.Column="2"
                                 Classes="primary"
                                 Command="{Binding PrepareNewIssueCommand}"
                                 Content="New issue"
                                 IsVisible="{Binding IsRepositoryIssuesTabActive}" />
 
-                        <!-- GitHub Milestones 목록의 상단 상태/정렬 행을 따라 Open, Closed, Sort를 먼저 노출합니다. -->
-                        <Grid Grid.ColumnSpan="4"
+                        <!-- GitHub-like milestone management is a repository tab, so this row only appears after the Milestones tab is selected. -->
+                        <Grid Grid.ColumnSpan="3"
                               ColumnDefinitions="Auto,Auto,*,Auto"
                               ColumnSpacing="16"
                               IsVisible="{Binding IsRepositoryMilestonesTabActive}">
