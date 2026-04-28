@@ -4,6 +4,9 @@ AGENTS.md
 # Superpowers brainstorming mockups are local planning artifacts.
 .superpowers/
 
+# Git worktrees are isolated implementation workspaces.
+.worktrees/
+
 # Build outputs
 bin/
 obj/
