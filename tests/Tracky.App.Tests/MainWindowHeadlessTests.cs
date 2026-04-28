@@ -141,6 +141,12 @@ public sealed class MainWindowHeadlessTests
             Assert.NotNull(FindVisual<TextBlock>(window, "RepositoryOwnerNameText"));
             Assert.NotNull(FindVisual<Button>(window, "RepositoryIssuesTabButton"));
             Assert.NotNull(FindVisual<Button>(window, "RepositoryProjectsTabButton"));
+            // The repository shell should expose only the streamlined GitHub-like local tabs.
+            Assert.NotNull(FindVisual<Button>(window, "RepositoryMilestonesTabButton"));
+            Assert.NotNull(FindVisual<Button>(window, "RepositoryMoreTabButton"));
+            Assert.Null(FindTextBlockByText(window, "Discussions"));
+            Assert.Null(FindTextBlockByText(window, "Actions"));
+            Assert.Null(FindTextBlockByText(window, "Security and quality"));
         }
         finally
         {
@@ -211,10 +217,7 @@ public sealed class MainWindowHeadlessTests
 
             var repositoryListBox = window.FindControl<ListBox>("RepositoryListBox");
             var repositoryIssuesTabButton = FindVisual<Button>(window, "RepositoryIssuesTabButton");
-            var repositoryMilestonesTabButton = FindVisual<Button>(window, "RepositoryMilestonesTabButton");
-            var repositoryDiscussionsTabButton = FindVisual<Button>(window, "RepositoryDiscussionsTabButton");
             var repositoryProjectsTabButton = FindVisual<Button>(window, "RepositoryProjectsTabButton");
-            var repositorySecurityTabButton = FindVisual<Button>(window, "RepositorySecurityTabButton");
             var repositoryIssuesListBox = FindVisual<ListBox>(window, "RepositoryIssuesListBox");
             var repositoryOwnerNameText = FindVisual<TextBlock>(window, "RepositoryOwnerNameText");
             var repositoryNameText = FindVisual<TextBlock>(window, "RepositoryNameText");
@@ -222,19 +225,24 @@ public sealed class MainWindowHeadlessTests
             var repositoryWatchButton = FindVisual<Button>(window, "RepositoryWatchButton");
             var repositoryForkButton = FindVisual<Button>(window, "RepositoryForkButton");
             var repositoryStarButton = FindVisual<Button>(window, "RepositoryStarButton");
+
+            // These expectations describe the repository shell that later XAML work will implement.
+            // The headless test intentionally names each control so future UI edits keep the shell contract stable.
+            var repositoryMilestonesTabButton = FindVisual<Button>(window, "RepositoryMilestonesTabButton");
+            var repositoryMoreTabButton = FindVisual<Button>(window, "RepositoryMoreTabButton");
             var repositoryIssueSearchBox = FindVisual<TextBox>(window, "RepositoryIssueSearchBox");
             var repositoryLabelsButton = FindVisual<Button>(window, "RepositoryLabelsButton");
-            var repositoryMilestonesButton = FindVisual<Button>(window, "RepositoryMilestonesButton");
             var repositoryNewIssueButton = FindVisual<Button>(window, "RepositoryNewIssueButton");
             var repositoryOpenIssuesText = FindVisual<TextBlock>(window, "RepositoryOpenIssuesText");
             var repositoryClosedIssuesText = FindVisual<TextBlock>(window, "RepositoryClosedIssuesText");
 
             Assert.NotNull(repositoryListBox);
             Assert.NotNull(repositoryIssuesTabButton);
-            Assert.Null(repositoryMilestonesTabButton);
-            Assert.NotNull(repositoryDiscussionsTabButton);
+            Assert.NotNull(repositoryMilestonesTabButton);
             Assert.NotNull(repositoryProjectsTabButton);
-            Assert.NotNull(repositorySecurityTabButton);
+            Assert.NotNull(repositoryMoreTabButton);
+            Assert.Null(FindVisual<Button>(window, "RepositoryDiscussionsTabButton"));
+            Assert.Null(FindVisual<Button>(window, "RepositorySecurityTabButton"));
             Assert.NotNull(repositoryIssuesListBox);
             Assert.NotNull(repositoryOwnerNameText);
             Assert.NotNull(repositoryNameText);
@@ -244,14 +252,13 @@ public sealed class MainWindowHeadlessTests
             Assert.Null(repositoryStarButton);
             Assert.NotNull(repositoryIssueSearchBox);
             Assert.NotNull(repositoryLabelsButton);
-            Assert.NotNull(repositoryMilestonesButton);
             Assert.NotNull(repositoryNewIssueButton);
             Assert.NotNull(repositoryOpenIssuesText);
             Assert.NotNull(repositoryClosedIssuesText);
             Assert.Same(viewModel.Projects, repositoryListBox.ItemsSource);
             Assert.Same(viewModel.RepositoryIssues, repositoryIssuesListBox.ItemsSource);
 
-            repositoryMilestonesButton.Command?.Execute(repositoryMilestonesButton.CommandParameter);
+            repositoryMilestonesTabButton.Command?.Execute(repositoryMilestonesTabButton.CommandParameter);
             window.UpdateLayout();
             var repositoryMilestonesPanel = FindVisual<ItemsControl>(window, "RepositoryMilestonesPanel");
             var repositoryMilestonesOpenText = FindVisual<TextBlock>(window, "RepositoryMilestonesOpenText");
@@ -265,11 +272,28 @@ public sealed class MainWindowHeadlessTests
             repositoryProjectsTabButton.Command?.Execute(repositoryProjectsTabButton.CommandParameter);
             window.UpdateLayout();
             var repositoryProjectsContent = FindVisual<ContentControl>(window, "RepositoryProjectsContent");
+            var repositoryProjectSavedViewsTabs = FindVisual<ItemsControl>(window, "RepositoryProjectSavedViewsTabs");
             var repositoryProjectsSearchBox = FindVisual<TextBox>(window, "RepositoryProjectsSearchBox");
+            var repositoryProjectViewButton = FindVisual<Button>(window, "RepositoryProjectViewButton");
+            var repositoryProjectTableButton = FindVisual<Button>(window, "RepositoryProjectTableButton");
+            var repositoryProjectBoardButton = FindVisual<Button>(window, "RepositoryProjectBoardButton");
+            var repositoryProjectGroupComboBox = FindVisual<ComboBox>(window, "RepositoryProjectGroupComboBox");
+            var repositoryProjectSortComboBox = FindVisual<ComboBox>(window, "RepositoryProjectSortComboBox");
+            var repositoryProjectFieldsPanel = FindVisual<StackPanel>(window, "RepositoryProjectFieldsPanel");
             var repositoryProjectsResultsText = FindVisual<TextBlock>(window, "RepositoryProjectsResultsText");
             Assert.NotNull(repositoryProjectsContent);
+            Assert.NotNull(repositoryProjectSavedViewsTabs);
             Assert.NotNull(repositoryProjectsSearchBox);
+            Assert.NotNull(repositoryProjectViewButton);
+            Assert.NotNull(repositoryProjectTableButton);
+            Assert.NotNull(repositoryProjectBoardButton);
+            Assert.NotNull(repositoryProjectGroupComboBox);
+            Assert.NotNull(repositoryProjectSortComboBox);
+            Assert.NotNull(repositoryProjectFieldsPanel);
             Assert.NotNull(repositoryProjectsResultsText);
+            Assert.Null(FindVisual<Button>(window, "RepositoryProjectCalendarButton"));
+            Assert.Null(FindVisual<Button>(window, "RepositoryProjectTimelineButton"));
+            Assert.Same(viewModel.ProjectSavedViews, repositoryProjectSavedViewsTabs.ItemsSource);
         }
         finally
         {
